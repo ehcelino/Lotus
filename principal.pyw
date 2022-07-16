@@ -35,6 +35,10 @@ from fpdf import FPDF
 # A FAZER
 # - intervalos - parar de cobrar a mensalidade quando uma pessoa fizer um intervalo
 # - planos - planos de 3 meses pré pagos para vender
+# - implementar log de erros de acordo com
+# https://stackoverflow.com/questions/3383865/how-to-log-error-to-file-and-not-fail-on-exception
+# - mudar a cor da linha na tabela quando um aluno estiver em pausa
+# - mudar a cor da linha quando um aluno estiver com um plano
 ################################################################
 
 
@@ -1663,10 +1667,9 @@ class Principal:
                                                [sg.T('Valor:', s=(6, 1)), sg.I(k='-VALOR-', s=(15, 1), disabled=True),
                                                 sg.Push(), sg.T('Final:', s=(6, 1)),
                                                 sg.I(k='-FINAL-', s=(15, 1), disabled=True)],
-                                               [sg.T('Valor mensal no plano:'),
-                                                sg.I(k='-VLMEN-', s=(15, 1), disabled=True),
-                                                sg.Push(), sg.B('Pausa', k='-PAUSA-'),
-                                                sg.B('Cancela', k='-CANCELA-')],
+                                               [sg.T('Normal:', s=(6, 1)), sg.I(k='-VLNORM-', s=(15, 1), disabled=True),
+                                                sg.Push(), sg.T('Plano:', s=(6, 1)),
+                                                sg.I(k='-VLMEN-', s=(15, 1), disabled=True)],
                                                [sg.HorizontalSeparator(k='-SEP-')],
                                                [sg.T('Planos disponíveis - clique para selecionar')],
                                                [sg.Table(values=planos_ler(),
@@ -1795,12 +1798,12 @@ class Principal:
                             tmpmonths = int(self.dadosinfop[self.rowinfop[0]][2])
                             valorstr = buscar_aluno_index(self.indiceinfo)[8]
                             valorstr = valorstr.replace(',', '.')
-                            valordesc = float(valorstr) * 0.10
+                            valordesc = float(valorstr) * float(self.dadosinfop[self.rowinfop[0]][3])
                             valorfinal = float(valorstr) - valordesc
                             self.windowinfo['-VLMEN-'].update(locale.currency(valorfinal))
+                            self.windowinfo['-VLNORM-'].update(str(buscar_aluno_index(self.indiceinfo)[8]))
                             valorfinal = valorfinal * tmpmonths
                             self.windowinfo['-VALOR-'].update(locale.currency(valorfinal))
-                            # TODO alterar o valor do plano para uma porcentagem da mensalidade
                             self.windowinfo['-INICIO-'].update(datetime.strftime(datetime.now(), '%d/%m/%Y'))
 
                             dtdatafinal = date.today() + relativedelta(months=+tmpmonths)
