@@ -183,7 +183,7 @@ def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrext
                 # se a data da mensalidade for igual a data entrada na funcao, e
                 # se a coluna me_pg for != 1 (ou seja não pago)
                 dadosupdt = [mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso, x[0]]
-                comando = 'UPDATE' + nometabela + ' SET me_mesano = ?, me_diaven = ?,me_valor = ?, me_datapagto = ?, me_vlrmulta = ?, me_vlrextras = ?, me_vlrpago = ?, me_pg = ?, me_atraso = ? WHERE me_index = ?'
+                comando = 'UPDATE ' + nometabela + ' SET me_mesano = ?, me_diaven = ?,me_valor = ?, me_datapgto = ?, me_vlrmulta = ?, me_vlrextras = ?, me_vlrpago = ?, me_pg = ?, me_atraso = ? WHERE me_index = ?'
                 c.execute(comando, dadosupdt)
                 resultado = 1
                 inseredtultpgto = True
@@ -238,6 +238,40 @@ def mensalidades_ler_atrasado(index, mesano):
     return dados
 
 
+# FUNCAO CRIA MENSALIDADE ATRASADA NAS TABELAS
+def mensalidades_criar():
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    dia = datetime.strftime(datetime.now(), '%d')
+    # mesano = '"' + datetime.strftime(datetime.now(), '%m/%Y') + '"'
+    mesano = datetime.strftime(datetime.now(), '%m/%Y')
+    comando = 'SELECT al_index, al_dt_vencto, al_valmens from Alunos WHERE al_dt_vencto < ' + dia
+    print(mesano)
+    c.execute(comando)
+    diasvencto = c.fetchall()
+    print(diasvencto)
+    conexao.close()
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
+    for idx, x in enumerate(diasvencto):
+        nometabela = 'mens_' + str(x[0])
+        print(nometabela)
+        print(str(x[0]))
+        valorstr = x[2].replace(',', '.')
+        # nometabela = 'mens_1'
+        # dados = [x[1], x[2], mesano]
+        # dados = [mesano]
+        comando = 'INSERT INTO ' + nometabela + ' (me_mesano,me_diaven,me_valor,me_pg) SELECT "' + mesano + '", "' + x[
+            1] + '", "' + valorstr + '", "0" WHERE NOT EXISTS (SELECT 2 FROM ' + nometabela + ' WHERE me_mesano = "' + mesano + '")'
+        # comando = 'UPDATE ' + nometabela + ' SET me_diaven= ?,me_valor = ? WHERE me_mesano = ?'
+        # comando = 'DELETE FROM ' + nometabela + ' WHERE me_mesano = ?'
+        print(comando)
+        # comando = 'SELECT * FROM ' + nometabela + ' WHERE me_mesano = ?'
+        c.execute(comando)
+    conexao.commit()
+    conexao.close()
+
+
 # FUNCAO LISTA MENSALIDADES ANTIGAS
 def mensalidades_lista(index):
     conexao = sqlite3.connect(mdbfile)
@@ -289,14 +323,52 @@ def planos_busca(index):
 
 
 # ESCREVE OS DADOS DO PLANO DO ALUNO
-def planos_escreve(index, planoindex, plano, inicio, fim):
+def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
     conexao = sqlite3.connect(dbfile)
-    dados = [planoindex, plano, inicio, fim, index]
     c = conexao.cursor()
-    c.execute('UPDATE Alunos SET al_planoindex = ?, al_plano = ?, al_pl_inicio = ?, al_pl_fim = ? WHERE al_index = ?',
-              dados)
+    # c.execute('SELECT al_pl_fim FROM Alunos WHERE al_index', (index,))
+    # tmpresult = c.fetchone()
+    dados = [planoindex, plano, inicio, inicio, fim, index]
+    c.execute(
+        'UPDATE Alunos SET al_planoindex = ?, al_plano = ?, al_pl_inicio = ?, al_ultimopagto = ?, al_pl_fim = ? WHERE al_index = ?',
+        dados)
     conexao.commit()
     conexao.close()
+    dadosmens = []
+    dia = inicio[0:2]
+    ano = inicio[6:]
+    print(inicio[3:5])
+    mesint = int(inicio[3:5])
+    x = 0
+    mesano = []
+    while x < duracao:
+        mesint2 = mesint + x
+        messtr = str(mesint2)
+        if len(messtr) == 1:
+            messtr = '0' + messtr
+        mesano.append(messtr + '/' + ano)
+        x = x + 1
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
+    nometabela = 'mens_' + str(index)
+    print(mesano)
+    for idx, x in enumerate(mesano):
+        dados = [x, dia, inicio, vlrmensal, 1]
+        comando = 'INSERT INTO ' + nometabela + '(me_mesano, me_diaven, me_datapgto, me_vlrpago, me_pg) VALUES (?,?,?,?,?)'
+        c.execute(comando, dados)
+        conexao.commit()
+    conexao.close()
+
+
+# FUNCAO CHECA SE O PLANO ESTA NO FINAL
+def planos_acabando(index):
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('SELECT al_pl_fim FROM Alunos WHERE al_index = ?', (index,))
+    resultado = c.fetchone()[0]
+    # print(resultado)
+    conexao.close()
+    return resultado
 
 
 # FUNCAO PEGA O al_index DO ULTIMO REGISTRO DA TABELA
@@ -809,6 +881,39 @@ class Ajuda:
 
 # FINAL JANELA AJUDA
 
+# INICIO LEMBRETES
+
+class Lembretes:
+
+    def __init__(self):
+        self.values = None
+        self.event = None
+        self.layout = [
+            [sg.Text('Lembretes', font='_ 25', key='-TITULO-')],
+            [sg.HorizontalSeparator(k='-SEP-')],
+            [sg.T('Data para o lembrete:'), sg.I(k='-DATA-', s=(10, 1)),
+             sg.CalendarButton('Data', locale='pt_BR', format='%d/%m/%Y',
+                               month_names=meses, day_abbreviations=dias)],
+            [sg.Multiline(size=(30, 10), k='-TEXTO-')],
+            [sg.Push(), sg.B('Gravar', k='-GRAVA-')],
+            [sg.Push(), sg.Button('Fechar', k='-FECHAR-')]
+        ]
+
+        self.window = sg.Window('Lembretes', self.layout,
+                                default_element_size=(12, 1), finalize=True, modal=True, disable_minimize=True,
+                                location=(150, 50))
+
+    def run(self):
+        while True:
+            self.event, self.values = self.window.read()
+
+            if self.event == sg.WIN_CLOSED or self.event == '-FECHAR-':
+                break
+        self.window.close()
+
+
+# FINAL LEMBRETES
+
 # INICIO RECEBE MENSALIDADE
 class Recebe:
     indicealuno = 2
@@ -964,8 +1069,11 @@ class Receber:
     mesano = ''
     datavencto = ''
     ematraso = False
+    vfinalmulta = 0.0
+    vlrmsldorig = True
 
     def __init__(self):
+        self.datapagto = None
         self.values = None
         self.event = None
 
@@ -979,9 +1087,10 @@ class Receber:
             [sg.HorizontalSeparator(k='-SEPATRASO-')],
             [sg.Text('Vencimento:', size=self.tam_texto), sg.Input(k='-DATAVEN-', size=self.tam_input, disabled=True),
              sg.Push(), sg.Text('Valor:', size=self.tam_texto),
-             sg.Input(k='-VALMENS-', size=self.tam_input, disabled=True)],
+             sg.Input(k='-VALMENS-', size=self.tam_input)],
             [sg.Text('Pagamento:', size=self.tam_texto, ),
-             sg.Input(k='-DATAPAGTO-', size=self.tam_input, default_text=datetime.strftime(datetime.now(), '%d/%m/%Y')),
+             sg.Input(k='-DATAPAGTO-', size=self.tam_input,
+                      default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'), enable_events=True),
              sg.CalendarButton('Data', locale='pt_BR', format='%d/%m/%Y', month_names=meses, day_abbreviations=dias),
              sg.Push(), sg.Text('Atraso:', size=self.tam_texto), sg.Input(k='-ATRASO-', size=self.tam_input)],
             [sg.Text('Multa:', self.tam_texto), sg.Input(k='-VALMULTA-', size=self.tam_input),
@@ -1040,15 +1149,18 @@ class Receber:
                 self.nome_aluno = str(buscar_aluno_index(self.indicealuno)[1])
                 valormsld = buscar_aluno_index(self.indicealuno)[8]
                 valormsld = valormsld.replace(',', '.')
-                self.vlrmensal = float(valormsld)
-                self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
+                if self.vlrmsldorig:
+                    self.vlrmensal = float(valormsld)
+                    self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
                 self.datavencto = \
                     str(buscar_aluno_index(self.indicealuno)[7]) + '/' + datetime.strftime(datetime.now(), '%m/%Y')
                 self.window['-DATAVEN-'].update(self.datavencto)
                 # diasatraso = diferenca_datas(geravencto(self.values['-DATAVEN-'].rstrip()),
                 #                              self.values['-DATAPAGTO-'].rstrip())
+                print('DATAPAGTO ', self.window['-DATAPAGTO-'].get())
+                self.datapagto = self.window['-DATAPAGTO-'].get()
                 self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
-                                                  datetime.strftime(datetime.now(), '%d/%m/%Y'))
+                                                  self.window['-DATAPAGTO-'].get())
                 self.window['-ATRASO-'].update(self.diasatraso)
                 # self.window['-VALREC-'].update(str(buscar_aluno_index(self.indicealuno)[8]))
                 self.mesano = datetime.strftime(datetime.now(), '%m/%Y')
@@ -1088,7 +1200,7 @@ class Receber:
                     for idx, x in enumerate(self.vendastbl):
                         self.valorextras = self.valorextras + locale.atof(x[3])
                         # EDITANDO mensalidade DE TAL tAL
-                    tmpappend = [99, datetime.strftime(datetime.now(), '%d/%m/%Y'), mens,
+                    tmpappend = [99, self.datapagto, mens,
                                  str(buscar_aluno_index(self.indicealuno)[8])]
                     print('Valores extras: ', self.valorextras)
                     self.vendastbl.append(tmpappend)
@@ -1102,6 +1214,16 @@ class Receber:
             if self.event in (sg.WIN_CLOSED, '-VOLTAR-'):
                 break
 
+            if self.event == '-CALC-':
+                mensalidade = str(self.window['-VALMENS-'].get())
+                mensalidade = mensalidade.translate({ord(c): None for c in "R$"})
+                mensalidade = mensalidade.replace(',', '.')
+                self.vlrmensal = float(mensalidade)
+                self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
+                self.valortotal = self.valorextras + self.vlrmensal
+                self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                self.vlrmsldorig = False
+
             if self.event == '-ATRASO0-':
                 self.ematraso = True
                 # EDITANDO
@@ -1111,11 +1233,9 @@ class Receber:
                 print('Atrasado: ', atrasado)
                 self.datavencto = str(atrasado[2]) + '/' + str(mesano2)
                 self.window['-DATAVEN-'].update(self.datavencto)
-                at_multa = self.vlrmulta
-                self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
-                self.window['-APLMULTA-'].update(text_color='Red')
-                self.window['-APLMULTA-'].update(value=True)
-                self.window.write_event_value('-APLMULTA-', 'value')
+
+                # self.window['-APLMULTA-'].update(value=True)
+                # self.window.write_event_value('-APLMULTA-', 'value')
                 # tmpappend = [99, datetime.strftime(datetime.now(), '%d/%m/%Y'), 'Multa', self.vlrmultastr]
                 vendastmp = []
                 vendastmp = self.window['-TABELA-'].Values
@@ -1125,17 +1245,39 @@ class Receber:
                 for idx, x in enumerate(vendastmp):
                     self.valortotal = self.valortotal + locale.atof(x[3])
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                # EDITANDO
                 self.vlrmensal = float(atrasado[3])
                 self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
-                self.diasatraso = diferenca_datas(self.datavencto,
-                                                  datetime.strftime(datetime.now(), '%d/%m/%Y'))
+
+                # self.diasatraso = diferenca_datas(self.datavencto,
+                # datetime.strftime(datetime.now(), '%d/%m/%Y'))
+                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
+                                                  self.window['-DATAPAGTO-'].get())
                 self.window['-ATRASO-'].update(self.diasatraso)
+                self.datapagto = self.window['-DATAPAGTO-'].get()
+                if self.diasatraso > 5:
+                    self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
+                    self.window['-APLMULTA-'].update(text_color='Red')
                 mens = 'Mensalidade de ' + self.mesano
                 # for idx, x in enumerate(self.vendastbl):
                 #    self.valorextras = self.valorextras + locale.atof(x[3])
                 # EDITANDO mensalidade DE TAL tAL
                 tmpappend = []
-                tmpappend = [99, datetime.strftime(datetime.now(), '%d/%m/%Y'), mens,
+                tmpappend = [99, self.datapagto, mens,
+                             str(buscar_aluno_index(self.indicealuno)[8])]
+                print('Valores extras: ', self.valorextras)
+                self.vendastbl = []
+                self.vendastbl.append(tmpappend)
+                self.window['-TABELA-'].update(values=self.vendastbl)
+
+            if self.event == '-DATAPAGTO-':
+                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
+                                                  self.window['-DATAPAGTO-'].get())
+                self.window['-ATRASO-'].update(self.diasatraso)
+                self.datapagto = self.window['-DATAPAGTO-'].get()
+                mens = 'Mensalidade de ' + self.mesano
+                tmpappend = []
+                tmpappend = [99, self.datapagto, mens,
                              str(buscar_aluno_index(self.indicealuno)[8])]
                 print('Valores extras: ', self.valorextras)
                 self.vendastbl = []
@@ -1156,6 +1298,7 @@ class Receber:
                         for idx, x in enumerate(vendastmp):
                             self.valortotal = self.valortotal + locale.atof(x[3])
                         self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                        self.vfinalmulta = self.vlrmulta
                     else:
                         print('entrou no else - ', self.values['-APLMULTA-'])
                         tmpappend = [99, datetime.strftime(datetime.now(), '%d/%m/%Y'), 'Multa', self.vlrmultastr]
@@ -1168,14 +1311,18 @@ class Receber:
                         for idx, x in enumerate(vendastmp):
                             self.valortotal = self.valortotal + locale.atof(x[3])
                         self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                        self.vfinalmulta = 0.0
 
             if self.event == '-CONF-':
                 valormsld = buscar_aluno_index(self.indicealuno)[8]
                 valormsld = valormsld.replace(',', '.')
                 tmp = mensalidades_insere(self.indicealuno, self.mesano,
                                           buscar_aluno_index(self.indicealuno)[7], self.vlrmensal,
-                                          datetime.strftime(datetime.now(), '%d/%m/%Y'), self.vlrmulta,
+                                          self.datapagto, self.vfinalmulta,
                                           self.valorextras, self.valortotal, 1, self.diasatraso)
+                if tmp == 0 or tmp == 1:
+                    sg.popup('Mensalidade recebida com sucesso.')
+                    break
                 if tmp == 2:
                     sg.popup('Esta mensalidade já foi paga.')
                     # insere_dados_financeiros(self.indicealuno, self.values['-DATAPAGTO-'].rstrip(), self.diasatraso,
@@ -1185,7 +1332,6 @@ class Receber:
                     print(tmpdata)
                     print(self.indicealuno)
                     venda_recebe(self.indicealuno, tmpdata)
-
         self.window.close()
 
 
@@ -1218,6 +1364,7 @@ class Principal:
     indiceinfo = 0
     rowinfo = []
     dadosinfo = []
+    planoinfo = True
     # ################################### MAIS INFO
 
     # ################################RECEBE VENDAS
@@ -1225,13 +1372,20 @@ class Principal:
     lcven = [0, 12, 25, 12]
     tmpdata = []
 
+    planos_fim = True
+    atrasados = True
+    em_atraso = []
+    periodo = 0
+    planos_acabando = []
+    planos_string = []
     largcol = [0, 25, 25, 12, 12, 20, 9, 6, 8, 9, 4]
     coljust = ['r', 'l', 'l', 'r', 'r', 'l', 'r', 'r', 'r', 'r']
     tblhead = ['Indice', 'Nome', 'Endereço', 'Telefone', 'CPF', 'E-mail', 'Mat.', 'Venc.', 'Mensalidade',
                'Último pagto', 'Ativo']
     # "!" DESABILITA ITEM DO MENU, "&" TRANSFORMA EM ATALHO DO TECLADO, "'---'" CRIA UMA LINHA ENTRE OPCOES DO MENU
     menu_def = [
-        ['&Arquivo', ['Adicionar aluno', 'Receber mensalidade', 'Informações do aluno', 'Financeiro', '---', '&Sair']],
+        ['&Arquivo', ['Adicionar aluno', 'Receber mensalidade',
+                      'Informações do aluno', 'Financeiro', 'Lembretes', '---', '&Sair']],
         # 'Save::savekey',
         ['&Editar', ['!Configurações', 'Mudar tema'], ],
         ['&Relatórios', ['Recebimento', 'Devedores']],
@@ -1243,6 +1397,8 @@ class Principal:
     dados = []
 
     def __init__(self):
+        self.layoutp = None
+        self.indicep = None
         self.rowinfop = None
         self.dadosinfop = None
         self.valuesven = None
@@ -1276,29 +1432,43 @@ class Principal:
         self.event = None
         sg.theme(sg.user_settings_get_entry('-tema-'))
         # print(ler_todos_dados()[1])
+        self.col1 = [
+            [sg.T('Bem vindo ao sistema Lótus')],
+            [sg.T('Hoje é ' + datetime.strftime(datetime.now(), '%d de %B de %Y'))],
+            [sg.Multiline('', s=(40, 15), k='-CAIXA-', background_color=sg.theme_background_color(),
+                          text_color=sg.theme_text_color(), disabled=True)]
+        ]
+        self.frame1 = [
+            [sg.T('    ', background_color='coral4'), sg.T('Mensalidade em atraso'),
+             sg.T('    ', background_color='slateblue'), sg.T('Plano próximo de acabar')]
+        ]
+
         self.layout = [
             [sg.Menu(self.menu_def, )],
             [sg.Text(''), sg.Image(source=imagem_peq), sg.Text('Sistema de gerenciamento de alunos', font='_ 25'), ],
             [sg.HorizontalSeparator(k='-SEP-')],
-            [sg.Table(values=ler_todos_dados_ativos(),
-                      visible_column_map=[False, True, True, True, True, True, True, True, False, True, True],
-                      headings=self.tblhead, max_col_width=25,
-                      auto_size_columns=False,
-                      col_widths=self.largcol,
-                      # display_row_numbers=True,
-                      justification='left',
-                      num_rows=18,
-                      # alternating_row_color='lightblue4',
-                      key='-TABELA-',
-                      # selected_row_colors='black on lightblue1',
-                      enable_events=True,
-                      expand_x=True,
-                      expand_y=True,
-                      # enable_click_events=True,
-                      # right_click_menu=self.right_click_menu, ESTE PARAMETRO CONTROLA O MENU DO BOTAO DIREITO
-                      # select_mode=TABLE_SELECT_MODE_BROWSE,
-                      bind_return_key=True  # ESTE PARAMETRO PERMITE A LEITURA DO CLIQUE DUPLO
-                      )],
+            [sg.Column(self.col1, ),
+             sg.Column([[sg.Table(values=ler_todos_dados_ativos(),
+                                  visible_column_map=[False, True, False, False, False, True, True, True, False, True,
+                                                      True],
+                                  headings=self.tblhead, max_col_width=25,
+                                  auto_size_columns=False,
+                                  col_widths=self.largcol,
+                                  # display_row_numbers=True,
+                                  justification='left',
+                                  num_rows=18,
+                                  # alternating_row_color='lightblue4',
+                                  key='-TABELA-',
+                                  # selected_row_colors='black on lightblue1',
+                                  enable_events=True,
+                                  expand_x=True,
+                                  expand_y=True,
+                                  # enable_click_events=True,
+                                  # right_click_menu=self.right_click_menu,
+                                  # ESTE PARAMETRO CONTROLA O MENU DO BOTAO DIREITO
+                                  # select_mode=TABLE_SELECT_MODE_BROWSE,
+                                  bind_return_key=True  # ESTE PARAMETRO PERMITE A LEITURA DO CLIQUE DUPLO
+                                  )]])],
             # [sg.Text('Local do click:'),sg.Input(k='-CLICKED-')],
             [sg.Text('Buscar aluno por nome'), sg.Input(key='-BUSCAR-'),
              sg.Button('Buscar', key='-BBUSCA-', bind_return_key=True),
@@ -1307,7 +1477,8 @@ class Principal:
             # [sg.Text('O que deseja fazer?')],
             [sg.Button('Adicionar alunos', key='-AD-'), sg.Button('Receber mensalidade', k='-RECEBE-'),
              sg.Button('Vender', k='-VENDA-'), sg.Button('Receber', k='-RECVENDA-'),
-             sg.Button('Mais informações', k='-MAISINFO-')],
+             sg.Button('Mais informações', k='-MAISINFO-'), sg.B('Pausa', k='-PAUSA-')],
+            [sg.Frame(title='', layout=self.frame1)],
             [sg.Push(), sg.Button('Sair', k='-SAIR-')],
             [sg.Text(key='-EXPAND-', font='ANY 1', pad=(0, 0))],
             [sg.StatusBar('Obrigado por usar um software de código aberto!', k='-STATUS-', s=10, expand_y=True)]
@@ -1336,12 +1507,35 @@ class Principal:
 
             tmptabela = self.window['-TABELA-'].Values
             # print(self.window['-TABELA-'].Values)
-            indice = 0
-            for idx, x in enumerate(tmptabela):
-                atrasado = mensalidades_atraso(x[0])
-                if atrasado:
-                    self.window['-TABELA-'].Update(row_colors=[[indice, 'red']])
-                indice = indice + 1
+            if self.atrasados:
+                indice = 0
+                for idx, x in enumerate(tmptabela):
+                    atrasado = mensalidades_atraso(x[0])
+                    if atrasado:
+                        self.window['-TABELA-'].Update(row_colors=[[indice, 'coral4']])
+                        # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+                    indice = indice + 1
+                self.atrasados = False
+            if self.planos_fim:
+                indice = 0
+                for idx, x in enumerate(tmptabela):
+                    # print(x[0])  # EDITANDO
+                    dttemp = planos_acabando(x[0])
+                    # print(dttemp)
+                    if dttemp is not None and dttemp != '':
+                        dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+                        dthoje = datetime.now()
+                        deltafim = dtatual - dthoje
+                        print(deltafim.days)
+                        diasfim = int(deltafim.days)
+                        if diasfim < 30:
+                            self.window['-TABELA-'].Update(row_colors=[[indice, 'slateblue']])
+                            # self.window['-CAIXA-'].print(
+                            #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
+                        self.planos_acabando.append((x[0], diasfim))
+                    indice = indice + 1
+                print(self.planos_acabando)
+                self.planos_fim = False
 
             self.event, self.values = self.window.read()
             # print(self.event,self.values)
@@ -1358,6 +1552,76 @@ class Principal:
                 if opcao == 'Sim':
                     sg.user_settings_set_entry('-location-', self.window.current_location())
                     break
+
+            if self.event == 'Lembretes':
+                objlembrete = Lembretes()
+                objlembrete.run()
+
+            if self.event == '-PAUSA-':
+                if len(self.row) != 0:
+                    self.indicep = self.dados[self.row[0]][0]
+                    self.layoutp = [
+                        [sg.Text('Pausa', font='_ 25')],
+                        [sg.HorizontalSeparator(k='-SEP-')],
+                        [sg.T('Aluno:', s=(6, 1)), sg.I(self.dados[self.row[0]][1], s=(48, 1), disabled=True)],
+                        [sg.T('Plano:', k='-LBPL-', s=(6, 1), visible=False),
+                         sg.I('Nenhum', k='-PLANO-', s=(25, 1), disabled=True, visible=False)],
+                        [sg.pin(sg.T('Início:', k='-LBIN-', s=(6, 1), visible=False)),
+                         sg.pin(sg.I(k='-INICIO-', s=(10, 1), disabled=True, visible=False)), sg.Push(),
+                         sg.pin(sg.T('Fim:', k='-LBFI-', s=(6, 1), visible=False)),
+                         sg.pin(sg.I(k='-FIM-', s=(10, 1), disabled=True, visible=False))],
+                        [sg.T('Última mens. paga:', s=(16, 1)), sg.I(k='-ULTIMAM-', s=(10, 1), disabled=True)],
+                        [sg.HorizontalSeparator(k='-SEP-')],
+                        [sg.T('Início da pausa:', s=(12, 1)),
+                         sg.I(datetime.strftime(datetime.now(), '%d/%m/%Y'), k='-DATA-', s=(10, 1), focus=True),
+                         sg.CalendarButton('Data', locale='pt_BR', format='%d/%m/%Y',
+                                           month_names=meses, day_abbreviations=dias), sg.Push(),
+                         sg.T('Dias em pausa:', s=(12, 1)), sg.I(k='-PERIODO-', s=(8, 1), enable_events=True)],
+                        [sg.T('Termina em:', s=(12, 1)), sg.I(k='-FIMPAUSA-', s=(10, 1)), sg.Push(),
+                         sg.T('Próxima cobrança:', s=(15, 1)), sg.I(k='-PROXCOB-', s=(10, 1))],
+                        [sg.HorizontalSeparator(k='-SEP-')],
+                        [sg.Push(), sg.B('Confirma', k='-CONF-'), sg.B('Sair', k='-SAIR-')]
+                    ]
+                    self.windowp = sg.Window('Pausa', self.layoutp, finalize=True)
+                    while True:
+                        planos = planos_busca(self.indicep)
+                        print(planos)
+                        if planos[0] is not None and planos[0] != '':
+                            print('entrou no if')
+                            self.windowp['-LBPL-'].update(visible=True)
+                            self.windowp['-PLANO-'].update(visible=True)
+                            self.windowp['-LBIN-'].update(visible=True)
+                            self.windowp['-INICIO-'].update(visible=True)
+                            self.windowp['-LBFI-'].update(visible=True)
+                            self.windowp['-FIM-'].update(visible=True)
+                            periodo = ''
+                            self.windowp['-PLANO-'].update(planos[1])
+                            self.windowp['-INICIO-'].update(planos[2])
+                            self.windowp['-FIM-'].update(planos[3])
+                            plan = planos_ler()
+                            per = 0
+                            for idx, x in enumerate(plan):
+                                if x[0] == planos[0]:
+                                    per = x[2]
+                            self.periodo = per
+                        self.eventp, self.valuesp = self.windowp.read()
+                        # print(self.event3)
+                        # print(self.values3)
+                        if self.eventp in (None, '-SAIR-'):
+                            break
+
+                        if self.eventp == '-PERIODO-':
+                            datastr = self.valuesp['-DATA-'].rstrip()
+                            dtinicio = datetime.strptime(datastr, '%d/%m/%Y')
+                            if self.valuesp['-PERIODO-'].rstrip() != '':
+                                per = int(self.valuesp['-PERIODO-'].rstrip())
+                                dtfinal = dtinicio + relativedelta(days=+per)
+                                dtfinalstr = datetime.strftime(dtfinal, '%d/%m/%Y')
+                                self.windowp['-FIMPAUSA-'].update(dtfinalstr)
+
+                    self.windowp.close()
+                else:
+                    sg.Popup('Selecione um registro na tabela.')
 
             if self.event == 'Financeiro':
                 objcontabil = contabil.Contabil()
@@ -1695,6 +1959,7 @@ class Principal:
                                                                                 month_names=meses,
                                                                                 day_abbreviations=dias),
                                                               sg.Push(),
+                                                              sg.B('Simular', k='-SIM-'),
                                                               sg.B('Inscrever', k='-INSC-'),
                                                               sg.B('Altera', k='-ALTERA-'),
                                                               sg.B('Pausa', k='-PAUSA-')]
@@ -1752,15 +2017,20 @@ class Principal:
                         self.windowinfo['-ULTPGT-'].update(str(buscar_aluno_index(self.indiceinfo)[9]))
                         planos = planos_busca(self.indiceinfo)
                         print(planos)
-                        if planos[0] is not None:
-                            print('entrou no if')
-                            periodo = ''
-                            self.windowinfo['-INSCRITO-'].update(planos[1])
-                            plan = planos_ler()
-                            for idx, x in enumerate(plan):
-                                if x[0] == planos[0]:
-                                    periodo = x[2]
-                            self.windowinfo['-PERIODO-'].update(str(periodo) + ' meses')
+                        if planos[0] is not None and planos[0] != '':
+                            if self.planoinfo:
+                                print('entrou no if')
+                                periodo = ''
+                                self.windowinfo['-INSCRITO-'].update(planos[1])
+                                plan = planos_ler()
+                                for idx, x in enumerate(plan):
+                                    if x[0] == planos[0]:
+                                        periodo = x[2]
+                                self.windowinfo['-PERIODO-'].update(str(periodo) + ' meses')
+                                self.windowinfo['-INICIO-'].update(planos[2])
+                                self.windowinfo['-FINAL-'].update(planos[3])
+                                # self.windowinfo['-VALOR-'].update(planos[2])
+                                self.planoinfo = False
 
                         if buscar_aluno_index(self.indiceinfo)[10] == 'S':
                             self.windowinfo['-RATV-'].update(value=True)
@@ -1792,7 +2062,7 @@ class Principal:
                             self.rowinfop = self.valuesinfo[self.eventinfo]
                             self.dadosinfop = self.windowinfo['-TABELAPL-'].Values
 
-                        if self.eventinfo == '-INSC-':
+                        if self.eventinfo == '-SIM-':
                             self.windowinfo['-INSCRITO-'].update(self.dadosinfop[self.rowinfop[0]][1])
                             self.windowinfo['-PERIODO-'].update(self.dadosinfop[self.rowinfop[0]][2])
                             tmpmonths = int(self.dadosinfop[self.rowinfop[0]][2])
@@ -1809,6 +2079,35 @@ class Principal:
                             dtdatafinal = date.today() + relativedelta(months=+tmpmonths)
                             datafinal = datetime.strftime(dtdatafinal, '%d/%m/%Y')
                             self.windowinfo['-FINAL-'].update(datafinal)
+
+                        if self.eventinfo == '-INSC-':
+                            self.windowinfo['-INSCRITO-'].update(self.dadosinfop[self.rowinfop[0]][1])
+                            self.windowinfo['-PERIODO-'].update(self.dadosinfop[self.rowinfop[0]][2])
+                            tmpmonths = int(self.dadosinfop[self.rowinfop[0]][2])
+                            valorstr = buscar_aluno_index(self.indiceinfo)[8]
+                            valorstr = valorstr.replace(',', '.')
+                            valordesc = float(valorstr) * float(self.dadosinfop[self.rowinfop[0]][3])
+                            valormensal = float(valorstr) - valordesc
+                            self.windowinfo['-VLMEN-'].update(locale.currency(valormensal))
+                            self.windowinfo['-VLNORM-'].update(str(buscar_aluno_index(self.indiceinfo)[8]))
+                            valorfinal = valormensal * tmpmonths
+                            self.windowinfo['-VALOR-'].update(locale.currency(valorfinal))
+                            self.windowinfo['-INICIO-'].update(datetime.strftime(datetime.now(), '%d/%m/%Y'))
+                            dtdatafinal = date.today() + relativedelta(months=+tmpmonths)
+                            datafinal = datetime.strftime(dtdatafinal, '%d/%m/%Y')
+                            self.windowinfo['-FINAL-'].update(datafinal)
+                            print(self.indiceinfo, self.dadosinfop[self.rowinfop[0]][0],
+                                  self.dadosinfop[self.rowinfop[0]][1],
+                                  datetime.strftime(datetime.now(), '%d/%m/%Y'), datafinal, tmpmonths,
+                                  valormensal)
+                            planos_escreve(self.indiceinfo, self.dadosinfop[self.rowinfop[0]][0],
+                                           self.dadosinfop[self.rowinfop[0]][1],
+                                           datetime.strftime(datetime.now(), '%d/%m/%Y'), datafinal, tmpmonths,
+                                           valormensal)
+                            self.planoinfo = True
+                            self.atrasados = False
+                            self.planos_fim = False
+                            sg.popup('Inscrito com sucesso.')
 
                         if self.eventinfo == '-AJUDA-':
                             obj_ajuda = Ajuda()
@@ -1845,7 +2144,7 @@ class Principal:
                                 sg.popup('Telefone deve ser no formato (xx)xxxxx-xxxx')
                             elif self.valuesinfo['-CPF-'].rstrip() != '' and not \
                                     re.fullmatch(regexCPF, self.valuesinfo['-CPF-'].rstrip()):
-                                sg.popup('Telefone deve ser no formato (xx)xxxxx-xxxx')  # EDITANDO
+                                sg.popup('Telefone deve ser no formato (xx)xxxxx-xxxx')
                             elif self.valuesinfo['-EMAIL-'].rstrip() != '' and not \
                                     re.fullmatch(regexEmail, self.valuesinfo['-EMAIL-'].rstrip()):
                                 sg.popup('Campo email deve ser no formato abc@de.fgh')
@@ -1890,13 +2189,62 @@ class Principal:
                                         else:
                                             busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), False)
                                         self.window['-TABELA-'].update(values=busca)
+                                        indice = 0
+                                        for idx, x in enumerate(tmptabela):
+                                            atrasado = mensalidades_atraso(x[0])
+                                            if atrasado:
+                                                self.window['-TABELA-'].Update(row_colors=[[indice, 'coral4']])
+                                                # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+                                            indice = indice + 1
+                                        indice = 0
+                                        for idx, x in enumerate(tmptabela):
+                                            # print(x[0])  # EDITANDO
+                                            dttemp = planos_acabando(x[0])
+                                            # print(dttemp)
+                                            if dttemp is not None and dttemp != '':
+                                                dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+                                                dthoje = datetime.now()
+                                                deltafim = dtatual - dthoje
+                                                print(deltafim.days)
+                                                diasfim = int(deltafim.days)
+                                                if diasfim < 30:
+                                                    self.window['-TABELA-'].Update(row_colors=[[indice, 'slateblue']])
+                                                self.planos_acabando.append((x[0], diasfim))
+                                            indice = indice + 1
                                     else:
                                         if self.values['-ATIVOS-']:
                                             temp = ler_todos_dados_ativos()
                                         else:
                                             temp = ler_todos_dados()
                                         # temp = ler_todos_dados()
+
                                         self.window['-TABELA-'].update(values=temp)
+                                        # CODIGO PARA AS CORES DA TABELA
+                                        tmptabela = self.window['-TABELA-'].Values
+                                        indice = 0
+                                        for idx, x in enumerate(tmptabela):
+                                            atrasado = mensalidades_atraso(x[0])
+                                            if atrasado:
+                                                self.window['-TABELA-'].Update(row_colors=[[indice, 'coral4']])
+                                                # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+                                            indice = indice + 1
+                                        indice = 0
+                                        for idx, x in enumerate(tmptabela):
+                                            # print(x[0])  # EDITANDO
+                                            dttemp = planos_acabando(x[0])
+                                            # print(dttemp)
+                                            if dttemp is not None and dttemp != '':
+                                                dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+                                                dthoje = datetime.now()
+                                                deltafim = dtatual - dthoje
+                                                print(deltafim.days)
+                                                diasfim = int(deltafim.days)
+                                                if diasfim < 30:
+                                                    self.window['-TABELA-'].Update(row_colors=[[indice, 'slateblue']])
+                                                    # self.window['-CAIXA-'].print(
+                                                    #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
+                                                self.planos_acabando.append((x[0], diasfim))
+                                            indice = indice + 1
                                     sg.Popup('Alterações efetuadas com sucesso.')
 
                         #########################################
@@ -1995,6 +2343,8 @@ class Principal:
                     busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), False)
                 # busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()))
                 # print(busca)
+                self.atrasados = True
+                self.planos_fim = True
                 self.window['-TABELA-'].update(values=busca)
 
             # if self.event == '-ATUALIZAR-':
@@ -2009,6 +2359,8 @@ class Principal:
                 else:
                     busca = ler_todos_dados()
                 # print(busca)
+                self.atrasados = True
+                self.planos_fim = True
                 self.window['-TABELA-'].update(values=busca)
 
             ##################################################
@@ -2120,6 +2472,8 @@ class Principal:
                             else:
                                 temp = ler_todos_dados()
                             # temp = ler_todos_dados()
+                            self.atrasados = True
+                            self.planos_fim = True
                             self.window['-TABELA-'].update(values=temp)
                 self.window2.close()
 
@@ -2591,6 +2945,7 @@ class RelNaoPago:
 # PRINCIPAL
 sg.user_settings_filename(path=ajustes)
 # splashscreen()
+mensalidades_criar()
 ObjPrincipal = Principal()
 ObjPrincipal.run()
 ############################################
