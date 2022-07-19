@@ -29,6 +29,7 @@ anos = ['2020', '2021', '2022', '2023', '2024', '2025']
 dbfinanceiro = os.path.join(os.getcwd(), 'db', 'financeiro.db')
 dbhistorico = os.path.join(os.getcwd(), 'db', 'historico.db')
 dbsistema = os.path.join(os.getcwd(), 'db', 'sistema.db')
+mdbfile = os.path.join(os.getcwd(), 'db', 'mensalidades.db')
 pdfvw = os.path.join(os.getcwd(), 'recursos', 'SumatraPDF.exe')
 arq_rel_mens = 'rel_mensal.pdf'
 regex_data = re.compile(r'\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{4}\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{4}')
@@ -104,6 +105,33 @@ def apaga_recorrente(index):
     c.execute('DELETE FROM recorrente WHERE re_index = ?', (index,))
     conexao.commit()
     conexao.close()
+
+
+def mensalidades_le_pagas(mesano):
+    valortotal = 0.0
+    conexao = sqlite3.connect(dbsistema)
+    c = conexao.cursor()
+    c.execute('SELECT al_index, al_nome FROM Alunos')
+    index_alunos = c.fetchall()
+    print(index_alunos[0][0])
+    conexao.close()
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
+    for idx, x in enumerate(index_alunos):
+        nometabela = 'mens_' + str(x[0])
+        print(nometabela)
+        comando = 'SELECT me_vlrpago FROM ' + nometabela + ' WHERE me_mesano = ? AND me_pg = "1"'
+        # print(comando)
+        c.execute(comando, (mesano,))
+        valorpago = c.fetchone()
+        print(valorpago)
+        if valorpago is not None:
+            valortotal = valortotal + float(valorpago[0])
+    print(valortotal)
+    valfinal = str(valortotal).replace('.', ',')
+    valfinal = valfinal + '0'
+    conexao.close()
+    return valfinal
 
 
 def recebido_mensal(mesano):
@@ -336,13 +364,13 @@ def incorpora_tabelas(mesano):
     # for idx, x in enumerate(array):
     if 100 not in array:
         grava_movimento((str(ult_dia[1]) + '/' + mesano), 'ENTRADA', 'Mensalidades do Estúdio',
-                        'Recebidos', recebido_mensal(mesano), '100')
+                        'Recebidos', mensalidades_le_pagas(mesano), '100')  # recebido_mensal(mesano)
     else:
         for idx, x in enumerate(temp_mov):
             if x[6] == 100:
-                if x[5] != recebido_mensal(mesano):
+                if x[5] != mensalidades_le_pagas(mesano):
                     altera_movimento((str(ult_dia[1]) + '/' + mesano), 'ENTRADA', 'Mensalidades do Estúdio',
-                                     'Recebidos', recebido_mensal(mesano), x[0])
+                                     'Recebidos', mensalidades_le_pagas(mesano), x[0])
 
 
 #        for idx2, x2 in enumerate(temp_rec):
@@ -1044,6 +1072,7 @@ class Contabil:
             ##########################################
             # TODO relatório anual
         self.window.close()
+
 
 # Ajustes feitos antes de rodar o programa
 # locale.setlocale(locale.LC_ALL, 'pt_BR')

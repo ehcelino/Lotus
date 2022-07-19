@@ -9,6 +9,8 @@ import os
 import re
 import shutil
 import locale
+import operator
+import calendar
 
 # from PySimpleGUI import TABLE_SELECT_MODE_BROWSE
 
@@ -70,6 +72,8 @@ arq_recibo = 'recibo.pdf'
 arq_relatorio = 'relatorio.pdf'
 sg.theme(sg.user_settings_get_entry('-tema-'))
 
+locale.setlocale(locale.LC_ALL, 'pt_BR')
+calendar.setfirstweekday(calendar.SUNDAY)
 
 # sg.show_debugger_popout_window()
 
@@ -285,8 +289,9 @@ def mensalidades_lista(index):
 
 
 # FUNCAO ATUALIZA AS TABELAS MENSALIDADES COM OS NAO PAGADORES
-def mensalidades_atualiza():
-    conexao = sqlite3.connect(dbfile)
+# TODO implementar funcao que busca a ultima mensalidade paga
+def mensalidades_ultima_paga(index):
+    conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
     c.execute('SELECT al_index, al_dt_vencto, al_valmens, al_ativo FROM Alunos')
     indices = c.fetchall()
@@ -850,6 +855,20 @@ def geravencto(datavencto):
 
 # FINAL FUNCAO GERA DATA VENCIMENTO
 
+def sort_table(table, cols):
+    """ sort a table by multiple columns
+        table: a list of lists (or tuple of tuples) where each inner list
+               represents a row
+        cols:  a list (or tuple) specifying the column numbers to sort by
+               e.g. (1,0) would sort by column 1, then by column 0
+    """
+    for col in reversed(cols):
+        try:
+            table = sorted(table, key=operator.itemgetter(col))
+        except Exception as e:
+            sg.popup_error('Error in sort_table', 'Exception in sort_table', e)
+    return table
+
 # INICIO JANELA AJUDA
 class Ajuda:
     nomearquivo = ''
@@ -1395,8 +1414,10 @@ class Principal:
     right_click_menu = ['Unused', ['Abrir', '!&Click', '&Menu', 'E&xit', 'Properties']]
     row = []
     dados = []
+    sort = True
 
     def __init__(self):
+        self.windowp = None
         self.layoutp = None
         self.indicep = None
         self.rowinfop = None
@@ -1447,9 +1468,9 @@ class Principal:
             [sg.Menu(self.menu_def, )],
             [sg.Text(''), sg.Image(source=imagem_peq), sg.Text('Sistema de gerenciamento de alunos', font='_ 25'), ],
             [sg.HorizontalSeparator(k='-SEP-')],
-            [sg.Column(self.col1, ),
+            [sg.Column(self.col1, visible=False),
              sg.Column([[sg.Table(values=ler_todos_dados_ativos(),
-                                  visible_column_map=[False, True, False, False, False, True, True, True, False, True,
+                                  visible_column_map=[False, True, True, False, False, True, True, True, False, True,
                                                       True],
                                   headings=self.tblhead, max_col_width=25,
                                   auto_size_columns=False,
@@ -1468,7 +1489,7 @@ class Principal:
                                   # ESTE PARAMETRO CONTROLA O MENU DO BOTAO DIREITO
                                   # select_mode=TABLE_SELECT_MODE_BROWSE,
                                   bind_return_key=True  # ESTE PARAMETRO PERMITE A LEITURA DO CLIQUE DUPLO
-                                  )]])],
+                                  )]], expand_x=True, expand_y=True)],
             # [sg.Text('Local do click:'),sg.Input(k='-CLICKED-')],
             [sg.Text('Buscar aluno por nome'), sg.Input(key='-BUSCAR-'),
              sg.Button('Buscar', key='-BBUSCA-', bind_return_key=True),
@@ -1477,8 +1498,9 @@ class Principal:
             # [sg.Text('O que deseja fazer?')],
             [sg.Button('Adicionar alunos', key='-AD-'), sg.Button('Receber mensalidade', k='-RECEBE-'),
              sg.Button('Vender', k='-VENDA-'), sg.Button('Receber', k='-RECVENDA-'),
-             sg.Button('Mais informações', k='-MAISINFO-'), sg.B('Pausa', k='-PAUSA-')],
-            [sg.Frame(title='', layout=self.frame1)],
+             sg.Button('Mais informações', k='-MAISINFO-'), sg.B('Pausa', k='-PAUSA-', visible=False)],
+            [sg.Frame(title='Legenda', layout=self.frame1)],
+            [sg.VPush()],
             [sg.Push(), sg.Button('Sair', k='-SAIR-')],
             [sg.Text(key='-EXPAND-', font='ANY 1', pad=(0, 0))],
             [sg.StatusBar('Obrigado por usar um software de código aberto!', k='-STATUS-', s=10, expand_y=True)]
@@ -1507,6 +1529,10 @@ class Principal:
 
             tmptabela = self.window['-TABELA-'].Values
             # print(self.window['-TABELA-'].Values)
+            if self.sort:
+                tabela_final = sort_table(tmptabela, (1,))
+                self.window['-TABELA-'].Update(values=tabela_final)
+                self.sort = False
             if self.atrasados:
                 indice = 0
                 for idx, x in enumerate(tmptabela):
@@ -1537,6 +1563,7 @@ class Principal:
                 print(self.planos_acabando)
                 self.planos_fim = False
 
+
             self.event, self.values = self.window.read()
             # print(self.event,self.values)
             # if ultimobkp
@@ -1556,6 +1583,10 @@ class Principal:
             if self.event == 'Lembretes':
                 objlembrete = Lembretes()
                 objlembrete.run()
+
+# ################################################################
+# Janela pausa : por enquanto não implementada.
+# ################################################################
 
             if self.event == '-PAUSA-':
                 if len(self.row) != 0:
@@ -1604,6 +1635,9 @@ class Principal:
                                 if x[0] == planos[0]:
                                     per = x[2]
                             self.periodo = per
+
+                        # busca a ultima mensalidade paga
+
                         self.eventp, self.valuesp = self.windowp.read()
                         # print(self.event3)
                         # print(self.values3)
@@ -1622,6 +1656,10 @@ class Principal:
                     self.windowp.close()
                 else:
                     sg.Popup('Selecione um registro na tabela.')
+
+# ################################################################
+# FIM Janela pausa
+# ################################################################
 
             if self.event == 'Financeiro':
                 objcontabil = contabil.Contabil()
@@ -2188,6 +2226,8 @@ class Principal:
                                             busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), True)
                                         else:
                                             busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), False)
+                                        tabela_final = sort_table(tmptabela, (1,))
+                                        self.window['-TABELA-'].Update(values=tabela_final)
                                         self.window['-TABELA-'].update(values=busca)
                                         indice = 0
                                         for idx, x in enumerate(tmptabela):
@@ -2220,6 +2260,8 @@ class Principal:
 
                                         self.window['-TABELA-'].update(values=temp)
                                         # CODIGO PARA AS CORES DA TABELA
+                                        tabela_final = sort_table(tmptabela, (1,))
+                                        self.window['-TABELA-'].Update(values=tabela_final)
                                         tmptabela = self.window['-TABELA-'].Values
                                         indice = 0
                                         for idx, x in enumerate(tmptabela):
@@ -2345,6 +2387,7 @@ class Principal:
                 # print(busca)
                 self.atrasados = True
                 self.planos_fim = True
+                self.sort = True
                 self.window['-TABELA-'].update(values=busca)
 
             # if self.event == '-ATUALIZAR-':
@@ -2361,6 +2404,7 @@ class Principal:
                 # print(busca)
                 self.atrasados = True
                 self.planos_fim = True
+                self.sort = True
                 self.window['-TABELA-'].update(values=busca)
 
             ##################################################
