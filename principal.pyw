@@ -250,17 +250,17 @@ def mensalidades_criar():
     # mesano = '"' + datetime.strftime(datetime.now(), '%m/%Y') + '"'
     mesano = datetime.strftime(datetime.now(), '%m/%Y')
     comando = 'SELECT al_index, al_dt_vencto, al_valmens from Alunos WHERE al_dt_vencto < ' + dia
-    print(mesano)
+    # print(mesano)
     c.execute(comando)
     diasvencto = c.fetchall()
-    print(diasvencto)
+    # print(diasvencto)
     conexao.close()
     conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
     for idx, x in enumerate(diasvencto):
         nometabela = 'mens_' + str(x[0])
-        print(nometabela)
-        print(str(x[0]))
+        # print(nometabela)
+        # print(str(x[0]))
         valorstr = x[2].replace(',', '.')
         # nometabela = 'mens_1'
         # dados = [x[1], x[2], mesano]
@@ -269,7 +269,7 @@ def mensalidades_criar():
             1] + '", "' + valorstr + '", "0" WHERE NOT EXISTS (SELECT 2 FROM ' + nometabela + ' WHERE me_mesano = "' + mesano + '")'
         # comando = 'UPDATE ' + nometabela + ' SET me_diaven= ?,me_valor = ? WHERE me_mesano = ?'
         # comando = 'DELETE FROM ' + nometabela + ' WHERE me_mesano = ?'
-        print(comando)
+        # print(comando)
         # comando = 'SELECT * FROM ' + nometabela + ' WHERE me_mesano = ?'
         c.execute(comando)
     conexao.commit()
@@ -497,7 +497,8 @@ def ler_todos_dados():
     c = conexao.cursor()
     c.execute("""
                 SELECT al_index,al_nome,al_endereco,al_telefone01,al_cpf,
-                al_email,al_dt_matricula,al_dt_vencto,al_valmens,al_ultimopagto,al_ativo FROM Alunos;
+                al_email,al_dt_matricula,al_dt_vencto,al_valmens,
+                al_ultimopagto,al_ativo,al_plano,al_pl_inicio,al_pl_fim FROM Alunos;
             """)
     dados = c.fetchall()
     #    for linha in c.fetchall():
@@ -515,7 +516,7 @@ def ler_todos_dados_ativos():
     c.execute("""
                 SELECT al_index,al_nome,al_endereco,al_telefone01,al_cpf,
                 al_email,al_dt_matricula,al_dt_vencto,al_valmens,
-                al_ultimopagto,al_ativo FROM Alunos WHERE al_ativo = 'S';
+                al_ultimopagto,al_ativo,al_plano,al_pl_inicio,al_pl_fim FROM Alunos WHERE al_ativo = 'S';
             """)
     dados = c.fetchall()
     #    for linha in c.fetchall():
@@ -1397,10 +1398,10 @@ class Principal:
     periodo = 0
     planos_acabando = []
     planos_string = []
-    largcol = [0, 25, 25, 12, 12, 20, 9, 6, 8, 9, 4]
+    largcol = [0, 25, 25, 12, 12, 20, 9, 6, 8, 9, 4, 15, 9, 9]
     coljust = ['r', 'l', 'l', 'r', 'r', 'l', 'r', 'r', 'r', 'r']
     tblhead = ['Indice', 'Nome', 'Endereço', 'Telefone', 'CPF', 'E-mail', 'Mat.', 'Venc.', 'Mensalidade',
-               'Último pagto', 'Ativo']
+               'Último pagto', 'Ativo', 'Plano', 'Início do plano', 'Fim do plano']
     # "!" DESABILITA ITEM DO MENU, "&" TRANSFORMA EM ATALHO DO TECLADO, "'---'" CRIA UMA LINHA ENTRE OPCOES DO MENU
     menu_def = [
         ['&Arquivo', ['Adicionar aluno', 'Receber mensalidade',
@@ -1470,8 +1471,8 @@ class Principal:
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Column(self.col1, visible=False),
              sg.Column([[sg.Table(values=ler_todos_dados_ativos(),
-                                  visible_column_map=[False, True, True, False, False, True, True, True, False, True,
-                                                      True],
+                                  visible_column_map=[False, True, False, True, False, False, True, False, False, True,
+                                                      False, True, False, True],
                                   headings=self.tblhead, max_col_width=25,
                                   auto_size_columns=False,
                                   col_widths=self.largcol,
