@@ -11,6 +11,8 @@ import shutil
 import locale
 import operator
 import calendar
+import logging
+from pygogo import logger
 
 # from PySimpleGUI import TABLE_SELECT_MODE_BROWSE
 
@@ -19,6 +21,7 @@ import contabil
 # from requests import NullHandler
 # from tkhtmlview import *
 from fpdf import FPDF
+import pandas as pd
 
 ################################################################
 # OBSERVACAO: PARA O FPDF FUNCIONAR, EXECUTE EM UM CMD ELEVADO:
@@ -44,6 +47,11 @@ from fpdf import FPDF
 ################################################################
 
 
+log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+formatter = logging.Formatter(log_format)
+logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger.debug('hello world')
+logger.error('hello error')
 # sg.theme(sg.user_settings_get_entry('-tema-', 'DarkBlue2'))
 
 # sg.set_options(use_custom_titlebar=True)
@@ -75,6 +83,7 @@ sg.theme(sg.user_settings_get_entry('-tema-'))
 locale.setlocale(locale.LC_ALL, 'pt_BR')
 calendar.setfirstweekday(calendar.SUNDAY)
 
+
 # sg.show_debugger_popout_window()
 
 # INICIO FUNCAO RECRIA BANCO DE DADOS
@@ -83,7 +92,7 @@ calendar.setfirstweekday(calendar.SUNDAY)
 def novobanco():
     try:
         shutil.copyfile(dbfile, dbfile + '.bkp')
-    except:
+    except OSError:
         print('erro')
     if os.path.exists(dbfile):
         os.remove(dbfile)
@@ -187,7 +196,10 @@ def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrext
                 # se a data da mensalidade for igual a data entrada na funcao, e
                 # se a coluna me_pg for != 1 (ou seja não pago)
                 dadosupdt = [mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso, x[0]]
-                comando = 'UPDATE ' + nometabela + ' SET me_mesano = ?, me_diaven = ?,me_valor = ?, me_datapgto = ?, me_vlrmulta = ?, me_vlrextras = ?, me_vlrpago = ?, me_pg = ?, me_atraso = ? WHERE me_index = ?'
+                comando = 'UPDATE ' + nometabela + ' SET me_mesano = ?,' \
+                                                   ' me_diaven = ?,me_valor = ?, me_datapgto = ?, me_vlrmulta = ?,' \
+                                                   ' me_vlrextras = ?, me_vlrpago = ?, me_pg = ?, me_atraso = ?' \
+                                                   ' WHERE me_index = ?'
                 c.execute(comando, dadosupdt)
                 resultado = 1
                 inseredtultpgto = True
@@ -195,7 +207,8 @@ def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrext
                 resultado = 2
     else:
         comando = 'INSERT INTO ' + nometabela + '(me_mesano,me_diaven,me_valor,me_datapgto' \
-                                                ',me_vlrmulta,me_vlrextras,me_vlrpago,me_pg,me_atraso) VALUES (?,?,?,?,?,?,?,?,?)'
+                                                ',me_vlrmulta,me_vlrextras,' \
+                                                'me_vlrpago,me_pg,me_atraso) VALUES (?,?,?,?,?,?,?,?,?)'
         c.execute(comando, dados)
         resultado = 0
         inseredtultpgto = True
@@ -305,6 +318,37 @@ def mensalidades_ultima_paga(index):
             # comando = 'SELECT me_mesano FROM {0} '.format(nometabela)
             # c.execute(comando)
             # dados = c.fetchall()
+
+
+# FUNCAO RELATORIO DE MENSALIDADES RECEBIDAS
+def mensalidades_relatorio(mesano):
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('SELECT al_index, al_nome FROM Alunos')
+    indicenome = c.fetchall()
+    conexao.close()
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
+    dados = []
+    logger.debug(mesano)
+    mesano = ('%' + mesano + '%')
+    for idx, x in enumerate(indicenome):
+        temp = []
+        nometabela = 'mens_' + str(x[0])
+        comando = 'SELECT me_datapgto, me_atraso, me_vlrpago, me_pg FROM ' + nometabela + ' WHERE me_mesano LIKE ?'
+        c.execute(comando, (mesano,))
+        temp = c.fetchone()
+        logger.debug(x[0])
+        logger.debug(temp)
+        # logger.debug('TEMP [3]: ', temp[3])
+        if temp is not None:
+            if temp[3] == 1 and not None:
+                temp2 = [temp[0], x[1], temp[1], temp[2]]
+                dados.append(temp2)
+
+    conexao.close()
+    # RETORNA data de pagamento, nome do aluno, atraso e valor pago.
+    return dados
 
 
 # FUNCAO LE A TABELA PLANOS
@@ -509,6 +553,13 @@ def ler_todos_dados():
 
 # FINAL FUNCAO LEITURA DOS DADOS
 
+def xstr(s):
+    if s is None:
+        return ''
+    else:
+        return s
+
+
 # INICIO FUNCAO LEITURA DOS DADOS ATIVOS
 def ler_todos_dados_ativos():
     conexao = sqlite3.connect(dbfile)
@@ -519,10 +570,21 @@ def ler_todos_dados_ativos():
                 al_ultimopagto,al_ativo,al_plano,al_pl_inicio,al_pl_fim FROM Alunos WHERE al_ativo = 'S';
             """)
     dados = c.fetchall()
+    dadoslinha = []
+    dadoscolunas = []
+    for idx, x in enumerate(dados):
+        dadoslinha = []
+        for idi, i in enumerate(x):
+            i = xstr(i)
+            dadoslinha.append(i)
+            print(dadoslinha)
+        dadoscolunas.append(dadoslinha)
+        # print(dadoscolunas)
+        # print(dadoscolunas)
     #    for linha in c.fetchall():
     #        print(linha)
     conexao.close()
-    return dados
+    return dadoscolunas
 
 
 # FINAL FUNCAO LEITURA DOS DADOS ATIVOS
@@ -869,6 +931,7 @@ def sort_table(table, cols):
         except Exception as e:
             sg.popup_error('Error in sort_table', 'Exception in sort_table', e)
     return table
+
 
 # INICIO JANELA AJUDA
 class Ajuda:
@@ -1564,7 +1627,6 @@ class Principal:
                 print(self.planos_acabando)
                 self.planos_fim = False
 
-
             self.event, self.values = self.window.read()
             # print(self.event,self.values)
             # if ultimobkp
@@ -1585,9 +1647,9 @@ class Principal:
                 objlembrete = Lembretes()
                 objlembrete.run()
 
-# ################################################################
-# Janela pausa : por enquanto não implementada.
-# ################################################################
+            # ################################################################
+            # Janela pausa : por enquanto não implementada.
+            # ################################################################
 
             if self.event == '-PAUSA-':
                 if len(self.row) != 0:
@@ -1658,9 +1720,9 @@ class Principal:
                 else:
                     sg.Popup('Selecione um registro na tabela.')
 
-# ################################################################
-# FIM Janela pausa
-# ################################################################
+            # ################################################################
+            # FIM Janela pausa
+            # ################################################################
 
             if self.event == 'Financeiro':
                 objcontabil = contabil.Contabil()
@@ -2668,7 +2730,7 @@ class BackupDB:
 # INICIO BACKUP COMPLETO
 class BackupCompleto:
     pastabkp = ''
-    pastaorig = '.'
+    pastaorig = os.getcwd()
     nomearq = ''
 
     def __init__(self):
@@ -2733,7 +2795,8 @@ class BackupCompleto:
 class RelatorioMensal:
     meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro',
              'Outubro', 'Novembro', 'Dezembro']
-    rot_tabela = ['Data', 'Aluno', 'Atraso', 'Rec. por', 'Valor']
+    rot_tabela = ['Data', 'Aluno', 'Atr.', 'Valor']
+    largcol = [10, 25, 5, 10]
 
     def __init__(self):
         self.values = None
@@ -2746,7 +2809,8 @@ class RelatorioMensal:
              sg.T('Ano:'), sg.I(default_text='2022', s=(10, 1), k='-ANO-')],
             [sg.Table(values=[], headings=self.rot_tabela,
                       # max_col_width=15,
-                      auto_size_columns=True,
+                      auto_size_columns=False,
+                      col_widths=self.largcol,
                       num_rows=15,
                       def_col_width=10,
                       alternating_row_color='lightblue4',
@@ -2758,16 +2822,20 @@ class RelatorioMensal:
                       enable_click_events=True
                       )],
             [sg.Push(), sg.T('Valor total recebido:'), sg.I(k='-TOTAL-', disabled=True, s=(10, 1))],
-            [sg.Button('Gerar relatório', key='-GERA-', bind_return_key=True),
+            [sg.Push(), sg.Button('Gerar relatório', key='-GERA-', bind_return_key=True),
              sg.Button('Imprimir', key='-IMPRIME-', disabled=True), sg.Button('Fechar', key='-FECHAR-')]
 
         ]
 
         self.window = sg.Window('Relatório mensal', self.layout, size=(
-            700, 500))  # return_keyboard_events=True, enable_close_attempted_event=True modal=True,
+            700, 500), finalize=True)  # return_keyboard_events=True, enable_close_attempted_event=True modal=True,
 
     def run(self):
         while True:
+            tmptabela = self.window['-TABLE-'].Values
+            tabela_final = sort_table(tmptabela, (0,))
+            self.window['-TABLE-'].update(tabela_final)
+
             self.event, self.values = self.window.read()
             mes = 0
             mesano = ''
@@ -2798,19 +2866,21 @@ class RelatorioMensal:
 
             if self.event == '-GERA-' or self.event == '-MES-':
                 mesano = str(mes) + '/' + str(self.values['-ANO-'].rstrip())
-                self.window['-TABLE-'].update(rel_fin_mensal(mesano))
-                calc_val_rec = rel_fin_mensal(mesano)
+                # self.window['-TABLE-'].update(rel_fin_mensal(mesano))
+                self.window['-TABLE-'].update('')
+                self.window['-TABLE-'].update(mensalidades_relatorio(mesano))
+                calc_val_rec = mensalidades_relatorio(mesano)
                 val_rec = 0.00
                 i = 0
                 while i < len(calc_val_rec):
-                    valor = calc_val_rec[i][4]
-                    valor = valor.replace(',', '.')
+                    valor = calc_val_rec[i][3]
+                    # valor = valor.replace(',', '.')
                     val_rec = val_rec + float(valor)
                     # print(val_rec)
                     i = i + 1
-                valfinal = str(val_rec).replace('.', ',')
-                valfinal = valfinal + '0'
-                self.window['-TOTAL-'].update(valfinal)
+                # valfinal = str(val_rec).replace('.', ',')
+                # valfinal = valfinal + '0'
+                self.window['-TOTAL-'].update(locale.currency(val_rec))
                 self.window['-IMPRIME-'].update(disabled=False)
 
             if self.event == '-IMPRIME-':
