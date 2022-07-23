@@ -12,7 +12,8 @@ import locale
 import operator
 import calendar
 import logging
-from pygogo import logger
+import pygogo as py
+# import random
 
 # from PySimpleGUI import TABLE_SELECT_MODE_BROWSE
 
@@ -21,7 +22,8 @@ import contabil
 # from requests import NullHandler
 # from tkhtmlview import *
 from fpdf import FPDF
-import pandas as pd
+
+# import pandas as pd
 
 ################################################################
 # OBSERVACAO: PARA O FPDF FUNCIONAR, EXECUTE EM UM CMD ELEVADO:
@@ -50,8 +52,8 @@ import pandas as pd
 log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 formatter = logging.Formatter(log_format)
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-logger.debug('hello world')
-logger.error('hello error')
+py.logger.debug('hello world')
+py.logger.error('hello error')
 # sg.theme(sg.user_settings_get_entry('-tema-', 'DarkBlue2'))
 
 # sg.set_options(use_custom_titlebar=True)
@@ -279,7 +281,8 @@ def mensalidades_criar():
         # dados = [x[1], x[2], mesano]
         # dados = [mesano]
         comando = 'INSERT INTO ' + nometabela + ' (me_mesano,me_diaven,me_valor,me_pg) SELECT "' + mesano + '", "' + x[
-            1] + '", "' + valorstr + '", "0" WHERE NOT EXISTS (SELECT 2 FROM ' + nometabela + ' WHERE me_mesano = "' + mesano + '")'
+            1] + '", "' + valorstr + '", "0" WHERE NOT EXISTS ' \
+                                     '(SELECT 2 FROM ' + nometabela + ' WHERE me_mesano = "' + mesano + '")'
         # comando = 'UPDATE ' + nometabela + ' SET me_diaven= ?,me_valor = ? WHERE me_mesano = ?'
         # comando = 'DELETE FROM ' + nometabela + ' WHERE me_mesano = ?'
         # print(comando)
@@ -330,25 +333,72 @@ def mensalidades_relatorio(mesano):
     conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
     dados = []
-    logger.debug(mesano)
+    py.logger.debug(mesano)
     mesano = ('%' + mesano + '%')
     for idx, x in enumerate(indicenome):
-        temp = []
+        # temp = []
         nometabela = 'mens_' + str(x[0])
         comando = 'SELECT me_datapgto, me_atraso, me_vlrpago, me_pg FROM ' + nometabela + ' WHERE me_mesano LIKE ?'
         c.execute(comando, (mesano,))
         temp = c.fetchone()
-        logger.debug(x[0])
-        logger.debug(temp)
+        py.logger.debug(x[0])
+        py.logger.debug(temp)
         # logger.debug('TEMP [3]: ', temp[3])
         if temp is not None:
             if temp[3] == 1 and not None:
                 temp2 = [temp[0], x[1], temp[1], temp[2]]
                 dados.append(temp2)
-
+    # dadoslinha = []
+    dadoscolunas = []
+    for idx, x in enumerate(dados):
+        dadoslinha = []
+        for idi, i in enumerate(x):
+            i = xstr(i)
+            dadoslinha.append(i)
+            # print(dadoslinha)
+        dadoscolunas.append(dadoslinha)
     conexao.close()
     # RETORNA data de pagamento, nome do aluno, atraso e valor pago.
-    return dados
+    return dadoscolunas
+
+
+def mensalidades_porcentagem(mesano):
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('SELECT al_index FROM Alunos')
+    alunos = c.fetchall()
+    qtd_alunos = len(alunos)
+    print('Contagem de linhas: ', qtd_alunos)
+    conexao.close()
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
+    temp = []
+    naopago = 0
+    pago = 0
+    arraytmp = []
+    for idx, x in enumerate(alunos):
+        nometabela = 'mens_' + str(x[0])
+        comando = 'SELECT me_pg FROM ' + nometabela + ' WHERE me_mesano LIKE ?'
+        c.execute(comando, (mesano,))
+        temp = c.fetchone()
+        arraytmp.append(temp)
+    # print('arraytmp: ', arraytmp[0][0])
+    for idx, x in enumerate(arraytmp):
+        if x is not None:
+            print('x: ', x)
+            # final_x = x.translate({ord(c): None for c in "(,)"})
+            if x[0] == 0:
+                naopago = naopago + 1
+            else:
+                pago = pago + 1
+    qtd_alunos = naopago + pago
+    print('Pago: ', pago)
+    print('Nao pago: ', naopago)
+    f_pago = (pago / qtd_alunos) * 100
+    f_npago = (naopago / qtd_alunos) * 100
+    print('Pagos: ', f_pago)
+    print('Não pagos: ', f_npago)
+    return f_pago, f_npago , qtd_alunos
 
 
 # FUNCAO LE A TABELA PLANOS
@@ -379,7 +429,8 @@ def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
     # tmpresult = c.fetchone()
     dados = [planoindex, plano, inicio, inicio, fim, index]
     c.execute(
-        'UPDATE Alunos SET al_planoindex = ?, al_plano = ?, al_pl_inicio = ?, al_ultimopagto = ?, al_pl_fim = ? WHERE al_index = ?',
+        'UPDATE Alunos SET al_planoindex = ?, al_plano = ?, al_pl_inicio = ?, al_ultimopagto = ?, al_pl_fim = ? WHERE '
+        'al_index = ?',
         dados)
     conexao.commit()
     conexao.close()
@@ -403,7 +454,8 @@ def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
     print(mesano)
     for idx, x in enumerate(mesano):
         dados = [x, dia, inicio, vlrmensal, 1]
-        comando = 'INSERT INTO ' + nometabela + '(me_mesano, me_diaven, me_datapgto, me_vlrpago, me_pg) VALUES (?,?,?,?,?)'
+        comando = 'INSERT INTO ' + nometabela + '(me_mesano, me_diaven, me_datapgto, me_vlrpago, me_pg) VALUES (?,?,' \
+                                                '?,?,?) '
         c.execute(comando, dados)
         conexao.commit()
     conexao.close()
@@ -577,7 +629,7 @@ def ler_todos_dados_ativos():
         for idi, i in enumerate(x):
             i = xstr(i)
             dadoslinha.append(i)
-            print(dadoslinha)
+            # print(dadoslinha)
         dadoscolunas.append(dadoslinha)
         # print(dadoscolunas)
         # print(dadoscolunas)
@@ -996,6 +1048,73 @@ class Lembretes:
 
 
 # FINAL LEMBRETES
+
+# CLASSE GRAFICO
+class grafico_mensal:
+    larg_barra = 50  # width of each bar
+    espacamento = 30  # space between each bar
+    borda = 3  # offset from the left edge for first bar
+    tamanho = (400, 300)
+
+    def __init__(self):
+        self.graph_value = None
+        self.event = None
+        self.values = None
+        self.graph = None
+        self.pagos = None
+        self.npagos = None
+        # self.layoutframe = [
+        #     [sg.Graph(self.tamanho, (0, -self.tamanho[0] // 2), (self.tamanho[0] // 2, self.tamanho[1] // 2),
+        #               k='-GRAFICO-', background_color='beige')]
+        # ]
+        self.layoutframe = [
+            [sg.Graph(self.tamanho, (0, 0),
+                      (self.tamanho[0], self.tamanho[1]),
+                      k='-GRAFICO-', background_color='beige')]
+            ]
+        self.layout = [
+            [sg.Text('Mensalidades em gráfico', font='_ 25', key='-NOMEALUNO-')],
+            [sg.HorizontalSeparator(k='-SEP-')],
+            [sg.Text('Percentual de mensalidades')],
+            # [sg.Text('Mês:'), sg.I(k='-MES-', s=(10, 1))],
+            [sg.Text('Mensalidades recebidas:'), sg.Text('', k='-REC-', background_color='green'),
+             sg.Push(), sg.Text('Mensalidades em haver:'), sg.Text('', k='-HAV-', background_color='red')],
+            [sg.Frame('Gráfico', layout=self.layoutframe)],
+            [sg.Push(), sg.Button('Voltar', k='-VOLTAR-')]
+        ]
+
+        self.window = sg.Window('Gráfico', self.layout, finalize=True)
+        self.graph: sg.Graph = self.window['-GRAFICO-']
+
+    def run(self):
+        while True:
+            porcentagens = mensalidades_porcentagem(datetime.strftime(datetime.now(), '%m/%Y'))
+            self.pagos = porcentagens[0]
+            self.npagos = porcentagens[1]
+            self.window['-REC-'].update(str(round(self.pagos)) + '%')
+            self.window['-HAV-'].update(str(round(self.npagos)) + '%')
+            self.graph.erase()
+
+            # self.graph_value = 100
+
+            # self.graph.draw_rectangle(top_left=(self.espacamento + self.borda, self.graph_value),
+            #                           bottom_right=(self.espacamento + self.borda + self.larg_barra, 0),
+            #                           fill_color='green', line_width=0)
+            esquerda = 140
+            self.graph.draw_rectangle(top_left=(esquerda, self.pagos + 150),
+                                      bottom_right=(esquerda + self.larg_barra, 75),
+                                      fill_color='green', line_width=0)
+
+            self.graph.draw_rectangle(top_left=(self.larg_barra + esquerda + self.espacamento, self.npagos + 150),
+                                      bottom_right=(self.larg_barra + esquerda + self.larg_barra +
+                                                    self.espacamento, 75), fill_color='red', line_width=0)
+            self.graph.draw_text('Pagas', (esquerda + 24, 70), color='green')
+            self.graph.draw_text('Não pagas', (esquerda + self.larg_barra + self.espacamento + 25, 70), color='red')
+            self.event, self.values = self.window.read()
+            if self.event in (sg.WIN_CLOSED, '-VOLTAR-'):
+                break
+        self.window.close()
+
 
 # INICIO RECEBE MENSALIDADE
 class Recebe:
@@ -1471,7 +1590,7 @@ class Principal:
                       'Informações do aluno', 'Financeiro', 'Lembretes', '---', '&Sair']],
         # 'Save::savekey',
         ['&Editar', ['!Configurações', 'Mudar tema'], ],
-        ['&Relatórios', ['Recebimento', 'Devedores']],
+        ['&Relatórios', ['Recebimento', 'Devedores', 'Gráfico']],
         ['&Ferramentas', ['Backup parcial', 'Backup completo', 'Administração', ['Limpar banco de dados']]],
         ['A&juda', ['Tela principal', 'Sobre...']], ]
     # ALTMENU
@@ -1642,6 +1761,10 @@ class Principal:
                 if opcao == 'Sim':
                     sg.user_settings_set_entry('-location-', self.window.current_location())
                     break
+
+            if self.event == 'Gráfico':
+                objgrafico = grafico_mensal()
+                objgrafico.run()
 
             if self.event == 'Lembretes':
                 objlembrete = Lembretes()
@@ -1836,7 +1959,7 @@ class Principal:
                     sg.popup('Selecione um registro na tabela.')
             ##################################################
             #             JANELA VENDAS
-            # todo: receber vendas anteriores
+            #
             ##################################################
             if self.event in ('-VENDA-', 'Receber venda'):
                 if len(self.row) != 0:
@@ -2805,7 +2928,6 @@ class RelatorioMensal:
             [sg.Text('Relatório de pagamentos do mês', font='_ 25', key='-TITULO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Mês desejado:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True),
-             # TODO
              sg.T('Ano:'), sg.I(default_text='2022', s=(10, 1), k='-ANO-')],
             [sg.Table(values=[], headings=self.rot_tabela,
                       # max_col_width=15,
