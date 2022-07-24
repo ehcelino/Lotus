@@ -654,7 +654,7 @@ def gera_pdf_mes(listatmp, mestmp, valorfinal):
 
 
 class Contabil:
-    locale.setlocale(locale.LC_ALL, 'pt_BR')
+    locale.setlocale(locale.LC_ALL, '')
     calendar.setfirstweekday(calendar.SUNDAY)
     sg.user_settings_filename(path=dirajustes)
     checa_historico(datetime.strftime(datetime.now(), '%m/%Y'))
