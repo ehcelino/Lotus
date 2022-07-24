@@ -83,7 +83,7 @@ arq_recibo = 'recibo.pdf'
 arq_relatorio = 'relatorio.pdf'
 sg.theme(sg.user_settings_get_entry('-tema-'))
 
-locale.setlocale(locale.LC_ALL, 'pt_BR')
+
 calendar.setfirstweekday(calendar.SUNDAY)
 
 
@@ -3089,8 +3089,11 @@ class BackupDB:
 # INICIO BACKUP COMPLETO
 class BackupCompleto:
     pastabkp = ''
-    pastaorig = os.getcwd()
+    endereco = os.getcwd()
     nomearq = ''
+    nomedapasta = os.path.basename(endereco)
+    enderecopai = os.path.dirname(endereco)
+
 
     def __init__(self):
         self.values = None
@@ -3123,17 +3126,12 @@ class BackupCompleto:
                 # self.pastabkp = self.values['-NOMEDAPASTA-'].rstrip() + '/' + 'sistema' + data
                 self.pastabkp = self.values['-NOMEDAPASTA-'].rstrip() + '/'
                 self.nomearq = 'sistema-' + data
-                # data = datetime.now()
-                # data = data.strftime("%d/%m/%Y")
-                # sg.user_settings_set_entry('-lastbackup-',data)
-                # print(self.pastabkp)
-                arquivos = os.listdir(self.pastaorig)
-                # print(arquivos)
-                # shutil.copytree(self.pastaorig,self.pastabkp)
+                arquivo = self.pastabkp + self.nomearq
                 try:
-                    shutil.make_archive((self.pastabkp + self.nomearq), 'zip', self.pastabkp, self.pastaorig)
+                    shutil.make_archive(base_name=arquivo, root_dir=self.enderecopai,
+                                        base_dir=self.nomedapasta, format='zip')
                     sg.popup('Arquivo compactado gerado com sucesso.')
-                except:
+                except OSError:
                     sg.popup('Erro na criação do arquivo compactado.')
                 # print(self.nomearqbkp)
                 # try:
