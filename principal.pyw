@@ -18,6 +18,7 @@ import pygogo as py
 # from PySimpleGUI import TABLE_SELECT_MODE_BROWSE
 
 import contabil
+import cores
 # from colorama import Back
 # from requests import NullHandler
 # from tkhtmlview import *
@@ -64,6 +65,17 @@ locale.setlocale(locale.LC_ALL, '')
 dbfile = os.path.join(os.getcwd(), 'db', 'sistema.db')
 mdbfile = os.path.join(os.getcwd(), 'db', 'mensalidades.db')
 imagem = os.path.join(os.getcwd(), 'recursos', 'logo.png')
+icones = [
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'banco.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'config.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'credito.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'erro.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'esporte.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'info.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'loja.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'pessoa.png'),
+    os.path.join(os.getcwd(), 'recursos', 'icones', 'pix.png'),
+]
 imagem_peq = os.path.join(os.getcwd(), 'recursos', 'logo_small.png')
 icone = os.path.join(os.getcwd(), 'recursos', 'logo_icon.ico')
 ajustes = os.path.join(os.getcwd(), 'ajustes')
@@ -305,23 +317,25 @@ def mensalidades_lista(index):
     return dados
 
 
-# FUNCAO ATUALIZA AS TABELAS MENSALIDADES COM OS NAO PAGADORES
-# TODO implementar funcao que busca a ultima mensalidade paga
+#  funcao que busca a ultima mensalidade paga
 def mensalidades_ultima_paga(index):
+    nometabela = 'mens_' + str(index)
     conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
-    c.execute('SELECT al_index, al_dt_vencto, al_valmens, al_ativo FROM Alunos')
-    indices = c.fetchall()
+    comando = 'SELECT me_mesano FROM ' + nometabela + ' WHERE me_pg = 1'
+    # print(comando)
+    c.execute(comando)
+    mensalidades = c.fetchall()
+    print('Mensalidades: ', mensalidades)
     conexao.close()
-    for idx, x in enumerate(indices):
-        if x[3] == 'S':
-            mensalidades_cria(x[0])
-            # nometabela = 'mens_' + str(x[0])
-            # conexao = sqlite3.connect(mdbfile)
-            # c = conexao.cursor()
-            # comando = 'SELECT me_mesano FROM {0} '.format(nometabela)
-            # c.execute(comando)
-            # dados = c.fetchall()
+    if mensalidades:
+        mensalidades_sorted = sorted(mensalidades)
+        resultado = mensalidades_sorted[len(mensalidades_sorted) - 1]
+    else:
+        resultado = 0
+    # for idx, x in enumerate(mensalidades):
+    #     if x[0] == 'S':
+    return resultado
 
 
 # FUNCAO RELATORIO DE MENSALIDADES RECEBIDAS
@@ -1030,6 +1044,9 @@ def geravencto(datavencto):
 
 # FINAL FUNCAO GERA DATA VENCIMENTO
 
+# FUNCAO ORGANIZA TABELA
+# extraída de Demo_Table_Element_Header_or_Cell_Clicks.py
+# que é parte do pacote de programas de demonstração da PySimpleGUI
 def sort_table(table, cols):
     """ sort a table by multiple columns
         table: a list of lists (or tuple of tuples) where each inner list
@@ -1059,26 +1076,49 @@ class Configuracoes:
         ]
         self.coluna1 = [
             [sg.Frame('Cores de realce', layout=[
-                [sg.T('Mensalidade em atraso:'), sg.I(k='-CMENS-', s=(6, 1)), sg.ColorChooserButton('Cor')],
-                [sg.T('Plano prestes a acabar:'), sg.I(k='-CPLA-', s=(6, 1)), sg.ColorChooserButton('Cor')]
+                # [sg.T('Mensalidade em atraso:'), sg.I(k='-CMENS-', s=(6, 1)), sg.ColorChooserButton('Cor')],
+                # [sg.T('Plano prestes a acabar:'), sg.I(k='-CPLA-', s=(6, 1)), sg.ColorChooserButton('Cor')]
+                [sg.T('Mensalidade em atraso:'), sg.Push(), sg.I(k='-CMENS-', s=(8, 1)), sg.B('Cor', k='-COR1-')],
+                [sg.T('Plano prestes a acabar:'), sg.Push(), sg.I(k='-CPLA-', s=(8, 1)), sg.B('Cor', k='-COR2-')]
             ])]
         ]
+
+        self.coluna2 = [
+            [sg.Frame('Backup', layout=[
+                [sg.Checkbox('Fazer backup automático?')],
+                [sg.T('Período: a cada'), sg.I(k='-PER-', s=(5, 1)), sg.T('dias.')],
+                [sg.T('Pasta de backup:'), sg.Push(), sg.I(k='-PASTA-', s=(20, 1)), sg.B('Pasta')],
+
+            ])]
+        ]
+
         self.layout = [
             [sg.Text('Configurações do sistema', font='_ 25', key='-TITULO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Column(self.coluna1)],
+            [sg.Column(self.coluna2)],
             # [sg.Frame('', self.layframe)],
             [sg.Push(), sg.Button('Fechar', k='-FECHAR-')]
         ]
 
         self.window = sg.Window('Configurações', self.layout,
-                                finalize=True, modal=True, disable_minimize=True)
+                                finalize=True, disable_minimize=True)  # modal=True,
 
     def run(self):
         while True:
-            # EDITANDO
 
             self.event, self.values = self.window.read()
+
+            if self.event == '-COR1-':
+                cor = cores.popup_color_chooser('Dark Blue 3')
+                self.window['-CMENS-'].update(cor)
+                self.window['-CMENS-'].update(background_color=cor)
+
+            if self.event == '-COR2-':
+                cor = cores.popup_color_chooser('Dark Blue 3')
+                self.window['-CPLA-'].update(cor)
+                self.window['-CPLA-'].update(background_color=cor)
+
             if self.event in (sg.WIN_CLOSED, '-FECHAR-'):
                 break
         self.window.close()
@@ -1224,7 +1264,8 @@ class grafico_mensal:
                       k='-GRAFICO-', background_color='beige')]
         ]
         self.layout = [
-            [sg.Text('Mensalidades em gráfico', font='_ 25', key='-NOMEALUNO-')],
+            [sg.Image(source=icones[0]),
+             sg.Text('Mensalidades em gráfico', font='_ 25', key='-NOMEALUNO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Percentual de mensalidades')],
             # [sg.Text('Mês:'), sg.I(k='-MES-', s=(10, 1))],
@@ -1267,6 +1308,7 @@ class grafico_mensal:
         self.window.close()
 
 
+"""
 # INICIO RECEBE MENSALIDADE
 class Recebe:
     indicealuno = 2
@@ -1395,6 +1437,7 @@ class Recebe:
                     # os.system(arq_recibo)
                     break
         self.window.close()
+"""
 
 
 # FINAL RECEBE MENSALIDADE
@@ -1431,7 +1474,8 @@ class Receber:
         self.event = None
 
         self.layout = [
-            [sg.Text('nome', font='_ 25', key='-NOMEALUNO-')],
+            [sg.Image(source=icones[2]),
+             sg.Text('nome', font='_ 25', key='-NOMEALUNO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.pin(sg.Text('Em atraso (clique para efetuar o pagamento): ',
                             k='-LBLATRASO-', visible=False, font='default 10 bold')),
@@ -1566,43 +1610,44 @@ class Receber:
             if self.event in (sg.WIN_CLOSED, '-VOLTAR-'):
                 break
 
+            # if self.event == '-VALMENS-' and self.values['-VALMENS-'] and self.values['-VALMENS-'][-1] not in ('R$0123456789,-'):
+            #     self.window['-VALMENS-'].update(self.values['-VALMENS-'][:-1])
+
             if self.event == '-CALC-':
                 mensalidade = str(self.window['-VALMENS-'].get())
                 mensalidade = mensalidade.translate({ord(c): None for c in "R$"})
                 mensalidade = mensalidade.replace(',', '.')
                 self.vlrmensal = float(mensalidade)
-                self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
+                # self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
                 self.valortotal = self.valorextras + self.vlrmensal
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
                 self.vlrmsldorig = False
+                # Alteracao teste para a tabela
+                mens = 'Mensalidade de ' + self.mesano
+                tmpappend = []
+                tmpappend = [99, self.datapagto, mens,
+                             str(locale.currency(self.vlrmensal))]
+                print('Valores extras: ', self.valorextras)
+                self.vendastbl = []
+                self.vendastbl.append(tmpappend)
+                self.window['-TABELA-'].update(values=self.vendastbl)
 
             if self.event == '-ATRASO0-':
                 self.ematraso = True
-
                 mesano2 = str(self.window['-ATRASO0-'].get())
                 self.mesano = str(self.window['-ATRASO0-'].get())
                 atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
                 print('Atrasado: ', atrasado)
                 self.datavencto = str(atrasado[2]) + '/' + str(mesano2)
                 self.window['-DATAVEN-'].update(self.datavencto)
-
-                # self.window['-APLMULTA-'].update(value=True)
-                # self.window.write_event_value('-APLMULTA-', 'value')
-                # tmpappend = [99, datetime.strftime(datetime.now(), '%d/%m/%Y'), 'Multa', self.vlrmultastr]
                 vendastmp = []
                 vendastmp = self.window['-TABELA-'].Values
-                # vendastmp.append(tmpappend)
-                # self.window['-TABELA-'].update(values=vendastmp)
                 self.valortotal = 0.0
                 for idx, x in enumerate(vendastmp):
                     self.valortotal = self.valortotal + locale.atof(x[3])
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
-
                 self.vlrmensal = float(atrasado[3])
                 self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
-
-                # self.diasatraso = diferenca_datas(self.datavencto,
-                # datetime.strftime(datetime.now(), '%d/%m/%Y'))
                 self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
                                                   self.window['-DATAPAGTO-'].get())
                 self.window['-ATRASO-'].update(self.diasatraso)
@@ -1611,9 +1656,38 @@ class Receber:
                     self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
                     self.window['-APLMULTA-'].update(text_color='Red')
                 mens = 'Mensalidade de ' + self.mesano
-                # for idx, x in enumerate(self.vendastbl):
-                #    self.valorextras = self.valorextras + locale.atof(x[3])
+                tmpappend = []
+                tmpappend = [99, self.datapagto, mens,
+                             str(buscar_aluno_index(self.indicealuno)[8])]
+                print('Valores extras: ', self.valorextras)
+                self.vendastbl = []
+                self.vendastbl.append(tmpappend)
+                self.window['-TABELA-'].update(values=self.vendastbl)
 
+            if self.event == '-ATRASO1-':
+                self.ematraso = True
+                mesano2 = str(self.window['-ATRASO1-'].get())
+                self.mesano = str(self.window['-ATRASO1-'].get())
+                atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
+                print('Atrasado: ', atrasado)
+                self.datavencto = str(atrasado[2]) + '/' + str(mesano2)
+                self.window['-DATAVEN-'].update(self.datavencto)
+                vendastmp = []
+                vendastmp = self.window['-TABELA-'].Values
+                self.valortotal = 0.0
+                for idx, x in enumerate(vendastmp):
+                    self.valortotal = self.valortotal + locale.atof(x[3])
+                self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                self.vlrmensal = float(atrasado[3])
+                self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
+                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
+                                                  self.window['-DATAPAGTO-'].get())
+                self.window['-ATRASO-'].update(self.diasatraso)
+                self.datapagto = self.window['-DATAPAGTO-'].get()
+                if self.diasatraso > 5:
+                    self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
+                    self.window['-APLMULTA-'].update(text_color='Red')
+                mens = 'Mensalidade de ' + self.mesano
                 tmpappend = []
                 tmpappend = [99, self.datapagto, mens,
                              str(buscar_aluno_index(self.indicealuno)[8])]
@@ -2176,7 +2250,8 @@ class Principal:
                         [sg.Push(), sg.B('Gravar/Receber', k='-GRAVA-'), sg.B('Cancelar', k='-VOLTAR-')]
                     ]
                     self.layoutv = [
-                        [sg.Text('Venda de produtos', font='_ 25', key='-VTITLE-')],
+                        [sg.Image(source=icones[6]),
+                         sg.Text('Venda de produtos', font='_ 25', key='-VTITLE-')],
                         [sg.HorizontalSeparator(k='-SEP-')],
                         [sg.Frame(title='', layout=self.framelayout)]
                     ]
@@ -2285,7 +2360,8 @@ class Principal:
                         [sg.T('Total:', s=(6, 1)), sg.I(k='-DTOT-', s=(10, 1), disabled=True)]
                     ]
                     self.layoutinfo = [
-                        [sg.Text('nome', font='_ 25', key='-NOMEALUNO-')],
+                        [sg.Image(source=icones[7]),
+                         sg.Text('nome', font='_ 25', key='-NOMEALUNO-')],
                         [sg.HorizontalSeparator(k='-SEP-')],
                         # [sg.Text('nome',relief='sunken', font=('italic'),key='-NOMEALUNO-')],
                         # [sg.Text('Informações detalhadas')],
@@ -2432,10 +2508,9 @@ class Principal:
                         self.windowinfo['-ULTPGT-'].update(str(buscar_aluno_index(self.indiceinfo)[9]))
                         self.windowinfo['-OPDESC-'].update(buscar_aluno_index(self.indiceinfo)[11])
                         self.windowinfo['-DIAS-'].update(buscar_aluno_index(self.indiceinfo)[12])
-                        if buscar_aluno_index(self.indiceinfo)[13] == 1:  # EdItANDO POR ULTIMO
+                        if buscar_aluno_index(self.indiceinfo)[13] == 1:
                             self.windowinfo['-DESC-'].update(value=True)
 
-                        # EDITANDO
                         planos = planos_busca(self.indiceinfo)
                         print(planos)
                         if planos[0] is not None and planos[0] != '':
@@ -2509,42 +2584,127 @@ class Principal:
                             # self.windowinfo['-VLNORM-'].update(str(buscar_aluno_index(self.indiceinfo)[8]))
                             self.windowinfo['-VLNORM-'].update(locale.currency(float(valorstr)))
                             self.windowinfo['-VLNORMT-'].update(locale.currency(vlrnormt))
-
+                            ultima_mensalidade = mensalidades_ultima_paga(self.indiceinfo)
+                            print('ultima mensalidade: ', ultima_mensalidade)
+                            if ultima_mensalidade == 0:
+                                diavencto = buscar_aluno_index(self.indiceinfo)[7]
+                                datainicio = datetime.now()
+                                datainicio = datainicio + relativedelta(day=int(diavencto))
+                                self.windowinfo['-INICIO-'].update(datetime.strftime(datainicio, '%d/%m/%Y'))
+                                datafim = datainicio + relativedelta(months=+tmpmonths)
+                                self.windowinfo['-FINAL-'].update(datetime.strftime(datafim, '%d/%m/%Y'))
+                            else:
+                                if ultima_mensalidade[0] >= datetime.strftime(datetime.now(), '%m/%Y'):
+                                    diavencto = buscar_aluno_index(self.indiceinfo)[7]
+                                    dtstr = diavencto + '/' + ultima_mensalidade[0]
+                                    dataultimamens = datetime.strptime(dtstr, '%d/%m/%Y')
+                                    # diferenca = dataultimamens - datetime.now()
+                                    datainicio = dataultimamens + relativedelta(months=1)
+                                    # datainicio = datainicio + relativedelta(day=int(diavencto))
+                                    datafim = datainicio + relativedelta(months=+tmpmonths)
+                                    self.windowinfo['-INICIO-'].update(datetime.strftime(datainicio, '%d/%m/%Y'))
+                                    self.windowinfo['-FINAL-'].update(datetime.strftime(datafim, '%d/%m/%Y'))
+                                else:
+                                    diavencto = buscar_aluno_index(self.indiceinfo)[7]
+                                    datainicio = datetime.now()
+                                    datainicio = datainicio + relativedelta(day=int(diavencto))
+                                    self.windowinfo['-INICIO-'].update(datetime.strftime(datainicio, '%d/%m/%Y'))
+                                    datafim = datainicio + relativedelta(months=+tmpmonths)
+                                    self.windowinfo['-FINAL-'].update(datetime.strftime(datafim, '%d/%m/%Y'))
                             self.windowinfo['-VALOR-'].update(locale.currency(valordesct))
-                            self.windowinfo['-INICIO-'].update(datetime.strftime(datetime.now(), '%d/%m/%Y'))
                             self.windowinfo['-DMEN-'].update(locale.currency(difmens))
                             self.windowinfo['-DTOT-'].update(locale.currency(diftot))
-                            dtdatafinal = date.today() + relativedelta(months=+tmpmonths)
-                            datafinal = datetime.strftime(dtdatafinal, '%d/%m/%Y')
-                            self.windowinfo['-FINAL-'].update(datafinal)
 
                         if self.eventinfo == '-INSC-':
                             self.windowinfo['-INSCRITO-'].update(self.dadosinfop[self.rowinfop[0]][1])
                             self.windowinfo['-PERIODO-'].update(self.dadosinfop[self.rowinfop[0]][2])
                             tmpmonths = int(self.dadosinfop[self.rowinfop[0]][2])
-                            valorstr = buscar_aluno_index(self.indiceinfo)[8]
-                            valorstr = valorstr.replace(',', '.')
-                            valordesc = float(valorstr) * float(self.dadosinfop[self.rowinfop[0]][3])
-                            valormensal = float(valorstr) - valordesc
-                            self.windowinfo['-VLMEN-'].update(locale.currency(valormensal))
-                            self.windowinfo['-VLNORM-'].update(str(buscar_aluno_index(self.indiceinfo)[8]))
-                            valorfinal = valormensal * tmpmonths
-                            self.windowinfo['-VALOR-'].update(locale.currency(valorfinal))
-                            self.windowinfo['-INICIO-'].update(datetime.strftime(datetime.now(), '%d/%m/%Y'))
-                            dtdatafinal = date.today() + relativedelta(months=+tmpmonths)
-                            datafinal = datetime.strftime(dtdatafinal, '%d/%m/%Y')
-                            self.windowinfo['-FINAL-'].update(datafinal)
-                            print(self.indiceinfo, self.dadosinfop[self.rowinfop[0]][0],
+                            if buscar_aluno_index(self.indiceinfo)[13] in (0, None, ''):
+                                valorstr = buscar_aluno_index(self.indiceinfo)[8]
+                                valorstr = valorstr.replace(',', '.')
+                                valordesc = float(valorstr) * float(self.dadosinfop[self.rowinfop[0]][3])
+                                valorfinal = float(valorstr) - valordesc
+                                vlrnormt = float(valorstr) * float(self.dadosinfop[self.rowinfop[0]][2])
+                            else:
+                                valorstr = buscar_aluno_index(self.indiceinfo)[8]
+                                valorstr = valorstr.replace(',', '.')
+                                valorfinal = float(valorstr)
+                                vlrnormt = float(valorstr) * float(self.dadosinfop[self.rowinfop[0]][2])
+                                sg.popup('Aluno já com desconto família: não é possível acumular descontos.')
+                            valordesct = valorfinal * tmpmonths
+                            # diferença entre a mensalidade completa e com desconto
+                            difmens = float(valorstr) - valorfinal
+                            # diferença entre os valores totais
+                            diftot = vlrnormt - float(valordesct)
+                            self.windowinfo['-VLMEN-'].update(locale.currency(valorfinal))
+                            # self.windowinfo['-VLNORM-'].update(str(buscar_aluno_index(self.indiceinfo)[8]))
+                            self.windowinfo['-VLNORM-'].update(locale.currency(float(valorstr)))
+                            self.windowinfo['-VLNORMT-'].update(locale.currency(vlrnormt))
+                            ultima_mensalidade = mensalidades_ultima_paga(self.indiceinfo)
+                            print('ultima mensalidade: ', ultima_mensalidade)
+                            if ultima_mensalidade == 0:
+                                diavencto = buscar_aluno_index(self.indiceinfo)[7]
+                                datainicio = datetime.now()
+                                datainicio = datainicio + relativedelta(day=int(diavencto))
+                                self.windowinfo['-INICIO-'].update(datetime.strftime(datainicio, '%d/%m/%Y'))
+                                datafim = datainicio + relativedelta(months=+tmpmonths)
+                                self.windowinfo['-FINAL-'].update(datetime.strftime(datafim, '%d/%m/%Y'))
+                            else:
+                                if ultima_mensalidade[0] >= datetime.strftime(datetime.now(), '%m/%Y'):
+                                    diavencto = buscar_aluno_index(self.indiceinfo)[7]
+                                    dtstr = diavencto + '/' + ultima_mensalidade[0]
+                                    dataultimamens = datetime.strptime(dtstr, '%d/%m/%Y')
+                                    # diferenca = dataultimamens - datetime.now()
+                                    datainicio = dataultimamens + relativedelta(months=1)
+                                    # datainicio = datainicio + relativedelta(day=int(diavencto))
+                                    datafim = datainicio + relativedelta(months=+tmpmonths)
+                                    self.windowinfo['-INICIO-'].update(datetime.strftime(datainicio, '%d/%m/%Y'))
+                                    self.windowinfo['-FINAL-'].update(datetime.strftime(datafim, '%d/%m/%Y'))
+                                else:
+                                    diavencto = buscar_aluno_index(self.indiceinfo)[7]
+                                    datainicio = datetime.now()
+                                    datainicio = datainicio + relativedelta(day=int(diavencto))
+                                    self.windowinfo['-INICIO-'].update(datetime.strftime(datainicio, '%d/%m/%Y'))
+                                    datafim = datainicio + relativedelta(months=+tmpmonths)
+                                    self.windowinfo['-FINAL-'].update(datetime.strftime(datafim, '%d/%m/%Y'))
+                            self.windowinfo['-VALOR-'].update(locale.currency(valordesct))
+                            self.windowinfo['-DMEN-'].update(locale.currency(difmens))
+                            self.windowinfo['-DTOT-'].update(locale.currency(diftot))
+
+                            print('Gravar no plano: ', self.indiceinfo, self.dadosinfop[self.rowinfop[0]][0],
                                   self.dadosinfop[self.rowinfop[0]][1],
-                                  datetime.strftime(datetime.now(), '%d/%m/%Y'), datafinal, tmpmonths,
-                                  valormensal)
-                            planos_escreve(self.indiceinfo, self.dadosinfop[self.rowinfop[0]][0],
-                                           self.dadosinfop[self.rowinfop[0]][1],
-                                           datetime.strftime(datetime.now(), '%d/%m/%Y'), datafinal, tmpmonths,
-                                           valormensal)
+                                  datetime.strftime(datainicio, '%d/%m/%Y'), datetime.strftime(datafim, '%d/%m/%Y'),
+                                  tmpmonths, valordesct)
+                            # DEPOIS DE CORRIGIR USAR O PRINT PARA OS DADOS DO PLANOS_ESCREVE
+                            # planos_escreve(self.indiceinfo, self.dadosinfop[self.rowinfop[0]][0],
+                            #               self.dadosinfop[self.rowinfop[0]][1],
+                            #               datainicio, datafim, tmpmonths,
+                            #               valordesct)
+
                             self.planoinfo = True
                             self.atrasados = False
                             self.planos_fim = False
+                            # EDITANDO oooOOOOoooOOOOooo
+                            mesano = datetime.strftime(datainicio, '%m/%Y')
+                            # mensalidades_insere(self.indiceinfo, mesano, diavencto, valorfinal,
+                            #                    datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                            #                    0.0, 0.0, valorfinal, 1, 0)
+                            print('Mensalidade um: ', self.indiceinfo, mesano, diavencto, valordesct,
+                                  datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                                  0.0, 0.0, valordesct, 1, 0)
+                            i = 1
+                            while i < tmpmonths:
+                                m = datetime.strptime(mesano, '%m/%Y')
+                                m = m + relativedelta(months=+i)
+                                ms = datetime.strftime(m, '%m/%Y')
+                                # mensalidades_insere(self.indiceinfo, ms, diavencto, 0.0,
+                                #                    datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                                #                    0.0, 0.0, 0.0, 1, 0)
+                                print('Mensalidade ', i, ': ', self.indiceinfo, ms, diavencto, 0.0,
+                                      datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                                      0.0, 0.0, 0.0, 1, 0)
+                                i = i + 1
+
                             sg.popup('Inscrito com sucesso.')
 
                         if self.eventinfo == '-AJUDA-':
@@ -2813,7 +2973,8 @@ class Principal:
 
             if self.event == '-AD-' or self.event == 'Adicionar aluno':
                 self.layout2 = [
-                    [sg.Text('Cadastro', font='_ 25', key='-NOMEALUNO-')],
+                    [sg.Image(source=icones[7]),
+                     sg.Text('Cadastro', font='_ 25', key='-NOMEALUNO-')],
                     [sg.HorizontalSeparator(k='-SEP-')],
                     [sg.Text('', size=(7, 1))],
                     [sg.Text('Nome:', size=(8, 1)),
@@ -3072,7 +3233,8 @@ class BackupDB:
         self.values = None
         self.event = None
         self.layout = [
-            [sg.Text('Cópia de segurança', font='_ 25')],
+            [sg.Image(source=icones[1]),
+             sg.Text('Cópia de segurança', font='_ 25')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Selecione a pasta onde deseja guardar uma cópia do banco de dados:')],
             [sg.Combo(sorted(sg.user_settings_get_entry('-foldernames-', [])),
@@ -3123,7 +3285,8 @@ class BackupCompleto:
         self.values = None
         self.event = None
         self.layout = [
-            [sg.Text('Cópia de segurança completa', font='_ 25')],
+            [sg.Image(source=icones[1]),
+             sg.Text('Cópia de segurança completa', font='_ 25')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.T('Esta função gera um arquivo compactado.')],
             [sg.T('De preferência, use como destino um drive removível (pendrive).')],
@@ -3184,7 +3347,8 @@ class RelatorioMensal:
         self.values = None
         self.event = None
         self.layout = [
-            [sg.Text('Relatório de pagamentos do mês', font='_ 25', key='-TITULO-')],
+            [sg.Image(source=icones[0]),
+             sg.Text('Relatório de pagamentos do mês', font='_ 25', key='-TITULO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Mês desejado:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True),
              sg.T('Ano:'), sg.I(default_text='2022', s=(10, 1), k='-ANO-')],
