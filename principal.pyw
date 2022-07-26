@@ -23,7 +23,7 @@ import cores
 # from requests import NullHandler
 # from tkhtmlview import *
 from fpdf import FPDF
-
+import pdfgen
 # import pandas as pd
 
 ################################################################
@@ -54,9 +54,7 @@ from fpdf import FPDF
 
 log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 formatter = logging.Formatter(log_format)
-logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-py.logger.debug('hello world')
-py.logger.error('hello error')
+logging.basicConfig(filename='errorlog.txt', level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 # sg.theme(sg.user_settings_get_entry('-tema-', 'DarkBlue2'))
 
 # sg.set_options(use_custom_titlebar=True)
@@ -92,8 +90,8 @@ regexCPF = re.compile(r'\d{3}\.\d{3}\.\d{3}\-\d{2}')
 regexDinheiro = re.compile(r'^(\d{1,}\d+\,\d{2}?)$')  # OK
 regexEmail = re.compile(r'^[\w\.]+@([\w-]+\.)+[\w-]{2,4}$')  # OK
 regexDia = re.compile(r'\b[0-3]{0,1}[0-9]{1}\b')  # OK
-arq_recibo = 'recibo.pdf'
-arq_relatorio = 'relatorio.pdf'
+# arq_recibo = 'recibo.pdf'
+# arq_relatorio = 'relatorio.pdf'
 sg.theme(sg.user_settings_get_entry('-tema-'))
 
 calendar.setfirstweekday(calendar.SUNDAY)
@@ -340,6 +338,7 @@ def mensalidades_ultima_paga(index):
 
 # FUNCAO RELATORIO DE MENSALIDADES RECEBIDAS
 def mensalidades_relatorio(mesano):
+    # RETORNA data de pagamento, nome do aluno, atraso e valor pago.
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
     c.execute('SELECT al_index, al_nome FROM Alunos')
@@ -348,7 +347,6 @@ def mensalidades_relatorio(mesano):
     conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
     dados = []
-    py.logger.debug(mesano)
     mesano = ('%' + mesano + '%')
     for idx, x in enumerate(indicenome):
         # temp = []
@@ -628,7 +626,7 @@ def gera_recibo_pdf(nome, valorpago, datapgto, datavencto, atraso, usuario):
     # rpdf.cell(40, 10, 'Hello World!', 1)
     # rpdf.cell(60, 10, 'Powered by FPDF.', 0, 1, 'C')
     # rpdf.output(arq_recibo, 'F')
-    rpdf.output(arq_recibo)
+    rpdf.output(pdfgen.arq_recibo)
 
 
 # FINAL FUNCAO GERA RECIBO
@@ -1066,6 +1064,12 @@ def sort_table(table, cols):
 
 class Configuracoes:
 
+    """
+    DEFINICOES:
+    '-cormensatraso-' = COR DE REALCE DO ALUNO COM MENSALIDADE EM ATRASO NA TABELA PRINCIPAL
+    '-corplanofinal-' = COR DE REALCE DO ALUNO COM PLANO PRESTES A ACABAR NA TABELA PRINCIPAL
+    """
+
     def __init__(self):
         self.values = None
         self.event = None
@@ -1106,18 +1110,29 @@ class Configuracoes:
 
     def run(self):
         while True:
-
+            tmp = sg.user_settings_get_entry('-cormensatraso-')
+            self.window['-CMENS-'].update(tmp)
+            self.window['-CMENS-'].update(background_color=tmp)
+            tmp = sg.user_settings_get_entry('-corplanofinal-')
+            self.window['-CPLA-'].update(tmp)
+            self.window['-CPLA-'].update(background_color=tmp)
             self.event, self.values = self.window.read()
 
             if self.event == '-COR1-':
                 cor = cores.popup_color_chooser('Dark Blue 3')
                 self.window['-CMENS-'].update(cor)
                 self.window['-CMENS-'].update(background_color=cor)
+                valor = self.window['-CMENS-'].get()
+                print(valor)
+                sg.user_settings_set_entry('-cormensatraso-', valor)
 
             if self.event == '-COR2-':
                 cor = cores.popup_color_chooser('Dark Blue 3')
                 self.window['-CPLA-'].update(cor)
                 self.window['-CPLA-'].update(background_color=cor)
+                valor = self.window['-CPLA-'].get()
+                print(valor)
+                sg.user_settings_set_entry('-corplanofinal-', valor)
 
             if self.event in (sg.WIN_CLOSED, '-FECHAR-'):
                 break
@@ -1206,6 +1221,38 @@ class Ajuda:
 
 
 # FINAL JANELA AJUDA
+
+# INICIO JANELA SOBRE
+
+class Sobre:
+    nomearquivo = 'sobre.txt'
+
+    def __init__(self):
+        self.values = None
+        self.event = None
+        self.layout = [
+            [sg.Image(source=imagem_peq), sg.Text('Sistema de gerenciamento de alunos', font='_ 20', key='-TITULO-')],
+            [sg.HorizontalSeparator(k='-SEP-')],
+            [sg.Text('')],
+            [sg.Multiline(disabled=True, size=(80, 20), k='-TEXTO-')],
+            [sg.Push(), sg.Button('Fechar', k='-FECHAR-')]
+        ]
+
+        self.window = sg.Window('Sobre...', self.layout,
+                                default_element_size=(12, 1), finalize=True, keep_on_top=True, disable_minimize=True)
+
+    def run(self):
+        while True:
+            self.window['-TEXTO-'].update(abrir_texto(self.nomearquivo))
+            # janelahtml = HTMLScrolledText(self.window.TKroot, html=abrir_texto(self.nomearquivo), width=60, height=20)
+            # janelahtml.pack()
+            self.event, self.values = self.window.read()
+            if self.event == sg.WIN_CLOSED or self.event == '-FECHAR-':
+                break
+        self.window.close()
+
+
+# FINAL JANELA SOBRE
 
 # INICIO LEMBRETES
 
@@ -1489,11 +1536,13 @@ class Receber:
              sg.Input(k='-DATAPAGTO-', size=self.tam_input,
                       default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'), enable_events=True),
              sg.CalendarButton('Data', locale='pt_BR', format='%d/%m/%Y', month_names=meses, day_abbreviations=dias),
-             sg.Push(), sg.Text('Atraso:', size=self.tam_texto), sg.Input(k='-ATRASO-', size=self.tam_input)],
-            [sg.Text('Multa:', self.tam_texto), sg.Input(k='-VALMULTA-', size=self.tam_input),
+             sg.pin(sg.T('DATA INVÁLIDA', k='-DINV-', visible=False, text_color='red', font='_ 10 bold')),
+             sg.Push(), sg.Text('Atraso:', size=self.tam_texto),
+             sg.Input(k='-ATRASO-', size=self.tam_input, disabled=True)],
+            [sg.Text('Multa:', self.tam_texto), sg.Input(k='-VALMULTA-', size=self.tam_input, disabled=True),
              sg.Checkbox('Aplica multa?', default=False, k='-APLMULTA-', enable_events=True),
              sg.Push(), sg.Text('Usuário:', size=self.tam_texto),
-             sg.Input(k='-USUARIO-', size=(18, 1), default_text='Andréia')],
+             sg.Input(k='-USUARIO-', size=(18, 1), default_text='Andréia', disabled=True)],
             [sg.Push(), sg.T('Adicionais'), sg.Push()],
             [sg.Table(values=[],
                       visible_column_map=[False, True, True, True],
@@ -1556,8 +1605,11 @@ class Receber:
                 #                              self.values['-DATAPAGTO-'].rstrip())
                 print('DATAPAGTO ', self.window['-DATAPAGTO-'].get())
                 self.datapagto = self.window['-DATAPAGTO-'].get()
-                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
-                                                  self.window['-DATAPAGTO-'].get())
+                try:
+                    self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
+                                                      self.window['-DATAPAGTO-'].get())
+                except Exception as Argument:
+                    logging.error(str(Argument))
                 self.window['-ATRASO-'].update(self.diasatraso)
                 # self.window['-VALREC-'].update(str(buscar_aluno_index(self.indicealuno)[8]))
                 self.mesano = datetime.strftime(datetime.now(), '%m/%Y')
@@ -1697,8 +1749,15 @@ class Receber:
                 self.window['-TABELA-'].update(values=self.vendastbl)
 
             if self.event == '-DATAPAGTO-':
-                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
-                                                  self.window['-DATAPAGTO-'].get())
+                try:
+                    self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
+                                                      self.window['-DATAPAGTO-'].get())
+                    self.window['-DINV-'].update(visible=False)
+                    self.window['-CONF-'].update(disabled=False)
+                except Exception as Argument:
+                    logging.error(str(Argument))
+                    self.window['-DINV-'].update(visible=True)
+                    self.window['-CONF-'].update(disabled=True)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
                 mens = 'Mensalidade de ' + self.mesano
@@ -1933,6 +1992,13 @@ class Principal:
     def run(self):
         global valtmp
         while True:
+
+            # TESTE DO LOG DE ERROS
+            # try:
+            #    sprint('Vaggie')
+            # except Exception as Argument:
+            #    logging.error(str(Argument))
+
             now = datetime.now()
             now = now.strftime('%d/%m/%Y')
             if sg.user_settings_get_entry('-lastbackup-') is None:
@@ -2009,6 +2075,10 @@ class Principal:
             if self.event == 'Lembretes':
                 objlembrete = Lembretes()
                 objlembrete.run()
+
+            if self.event == 'Sobre...':
+                objsobre = Sobre()
+                objsobre.run()
 
             # ################################################################
             # Janela pausa : por enquanto não implementada.
@@ -2870,7 +2940,7 @@ class Principal:
                                                 str(self.dadosinfo[self.rowinfo[0]][0]),
                                                 str(self.dadosinfo[self.rowinfo[0]][4]))
                                 self.windowinfo.perform_long_operation(
-                                    lambda: os.system('\"' + pdfviewer + '\" ' + arq_recibo), '-FUNCTION COMPLETED-')
+                                    lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_recibo), '-FUNCTION COMPLETED-')
                             # os.system(arq_recibo)
                             #    print('dadosinfo[rowinfo]:',dadosinfo[rowinfo[0]])
                             #    print('rowinfo INDEX:',dadosinfo[rowinfo[0]][0])
@@ -3011,7 +3081,6 @@ class Principal:
                 self.window2.bind('<F1>', '-AJUDA-')
                 while True:
 
-                    # EDITANDO
                     dttmp = datetime.now()
                     dttmp2 = dttmp.strftime('%d/%m/%Y')
                     self.window2['-MAT-'].update(dttmp2)
@@ -3025,7 +3094,7 @@ class Principal:
 
                     if self.event2 == '-OPCAO-':
                         print(self.values2['-OPCAO-'])
-                        self.opcaoselec = opcao_buscar_desc(self.values2['-OPCAO-'])  # EDitando
+                        self.opcaoselec = opcao_buscar_desc(self.values2['-OPCAO-'])
                         print(self.opcaoselec)
                         print(self.opcaoselec[0])
                         print(self.opcaoselec[1])
@@ -3404,6 +3473,10 @@ class RelatorioMensal:
                 self.primeiro = False
 
             self.event, self.values = self.window.read()
+
+            if self.event in (sg.WIN_CLOSED, '-FECHAR-'):
+                break
+
             mes = 0
             mesano = ''
             if self.values['-MES-'].rstrip() == 'Janeiro':
@@ -3450,59 +3523,15 @@ class RelatorioMensal:
                 self.window['-TOTAL-'].update(locale.currency(val_rec))
                 self.window['-IMPRIME-'].update(disabled=False)
 
-            if self.event == '-IMPRIME-':
-                relpdf = FPDF('P', 'cm', 'A4')
-                relpdf.add_page()
-                relpdf.add_font('Calibri', 'I', 'Calibrii.ttf', uni=True)
-                relpdf.add_font('Calibri', 'B', 'Calibrib.ttf', uni=True)
-                relpdf.add_font('Calibri', '', 'Calibri.ttf', uni=True)
-                relpdf.image(imagem_peq, 16.6, 1.6)
-                relpdf.set_font('Calibri', 'B', 14)
-                relpdf.cell(0, 0.6, '', 0, 2, 'C')
-                relpdf.cell(0, 0.6, '', 0, 2, 'C')
-                relpdf.cell(0, 0.6, '', 0, 2, 'C')
-                relpdf.cell(0, 0.6, '', 0, 2, 'C')
-                tempstr = 'Relatório de recebimento do mês de ' + str(self.values['-MES-'].rstrip()) + ' de ' + \
-                          self.values['-ANO-'].rstrip()
-                relpdf.line(1, 4.5, 20, 4.5)
-                relpdf.cell(0, 0.6, tempstr, 0, 2, 'C')
-                relpdf.cell(0, 2, '', 0, 2, 'C')
-                templist = rel_fin_mensal(mesano)
-                relpdf.cell(1.4, 0.6, str(''), 0, 0, 'L')
-                relpdf.cell(3.8, 0.6, str('Data do pagto.'), 0, 0, 'L')
-                relpdf.cell(5.8, 0.6, str('Nome'), 0, 0, 'L')
-                relpdf.cell(2.4, 0.6, str('Atraso.'), 0, 0, 'L')
-                relpdf.cell(3, 0.6, str('Rec. por'), 0, 0, 'L')
-                relpdf.cell(6.2, 0.6, str('Valor'), 0, 1, 'L')
-                i = 0
-                while i < len(templist):
-                    relpdf.cell(1.6, 0.6, str(''), 0, 0, 'L')
-                    tempstr = templist[i][0]
-                    # print(tempstr)
-                    relpdf.cell(3.6, 0.6, str(tempstr), 0, 0, 'L')
-                    tempstr = templist[i][1]
-                    # print(tempstr)
-                    # relpdf.cell(0,0.6,str(tempstr),0,0,'R')
-                    relpdf.cell(6.2, 0.6, str(tempstr), 0, 0, 'L')
-                    tempstr = templist[i][2]
-                    relpdf.cell(2, 0.6, str(tempstr), 0, 0, 'L')
-                    tempstr = templist[i][3]
-                    relpdf.cell(3, 0.6, str(tempstr), 0, 0, 'L')
-                    tempstr = templist[i][4]
-                    relpdf.cell(1, 0.6, str(tempstr), 0, 1, 'L')
-                    i = i + 1
-                relpdf.cell(0, 0.6, '', 0, 2, 'C')
-                relpdf.line(relpdf.get_x(), relpdf.get_y(), 20, relpdf.get_y())
-                tempstr = 'Valor total recebido: ' + self.values['-TOTAL-'].rstrip()
-                relpdf.cell(11.8, 0.6, str(''), 0, 0, 'L')
-                relpdf.cell(0, 0.6, str(tempstr), 0, 2, 'L')
-                # relpdf.output(arq_relatorio, 'F')
-                relpdf.output(arq_relatorio)
-                self.window.perform_long_operation(lambda: os.system('\"' + pdfviewer + '\" ' + arq_relatorio),
+            if self.event == '-IMPRIME-':  # EDITANDO OOooOOO
+                pdfgen.gera_relatorio_pdf(
+                    str(self.values['-MES-'].rstrip()), self.values['-ANO-'].rstrip(),
+                    self.values['-TOTAL-'].rstrip(), mensalidades_relatorio(mesano))
+
+                self.window.perform_long_operation(lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_relatorio),
                                                    '-FUNCTION COMPLETED-')
 
-            if self.event == sg.WIN_CLOSED or self.event == '-FECHAR-':
-                break
+
 
         self.window.close()
 
