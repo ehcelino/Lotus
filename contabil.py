@@ -5,6 +5,8 @@ import sqlite3
 import calendar
 import locale
 import re
+
+from dateutil.relativedelta import relativedelta
 from fpdf import FPDF
 
 # from json import (load as jsonload, dump as jsondump)
@@ -119,15 +121,15 @@ def mensalidades_le_pagas(mesano):
     c = conexao.cursor()
     for idx, x in enumerate(index_alunos):
         nometabela = 'mens_' + str(x[0])
-        print(nometabela)
+        # print(nometabela)
         comando = 'SELECT me_vlrpago FROM ' + nometabela + ' WHERE me_mesano = ? AND me_pg = "1"'
         # print(comando)
         c.execute(comando, (mesano,))
         valorpago = c.fetchone()
-        print(valorpago)
+        # print(valorpago)
         if valorpago is not None:
             valortotal = valortotal + float(valorpago[0])
-    print(valortotal)
+    # print(valortotal)
     valfinal = str(valortotal).replace('.', ',')
     valfinal = valfinal + '0'
     conexao.close()
@@ -366,9 +368,16 @@ def incorpora_tabelas(mesano):
         grava_movimento((str(ult_dia[1]) + '/' + mesano), 'ENTRADA', 'Mensalidades do Estúdio',
                         'Recebidos', mensalidades_le_pagas(mesano), '100')  # recebido_mensal(mesano)
     else:
+        print('entrou no else do incorpora_tabelas()')
+        # RETORNA mo_index,mo_data,mo_ensai,mo_tipo,mo_descricao,
+        #             mo_valor,mo_relrec FROM movimento WHERE mo_data
+        print(temp_mov)
         for idx, x in enumerate(temp_mov):
+            print(x[6])
             if x[6] == 100:
+                print(x[5])
                 if x[5] != mensalidades_le_pagas(mesano):
+                    print('Entrou no if de valores diferentes')
                     altera_movimento((str(ult_dia[1]) + '/' + mesano), 'ENTRADA', 'Mensalidades do Estúdio',
                                      'Recebidos', mensalidades_le_pagas(mesano), x[0])
 
@@ -763,6 +772,7 @@ class Contabil:
 
     def run(self):
         while True:  # Event Loop
+            incorpora_tabelas(datetime.strftime(datetime.now() + relativedelta(months=-1), '%m/%Y'))
             incorpora_tabelas(datetime.strftime(datetime.now(), '%m/%Y'))
             # incorpora_tabelas('06/2022')
             # loc = locale.getlocale()
@@ -1087,3 +1097,4 @@ class Contabil:
 # contabilidade.run()
 # gera_df()
 # gera_pdf_mes(le_movimento(datetime.strftime(datetime.now(), '%m/%Y')), 'Maio', '100,00')
+# mensalidades_le_pagas('07/2022')

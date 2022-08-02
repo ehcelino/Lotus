@@ -5,6 +5,7 @@ imagem_peq = os.path.join(os.getcwd(), 'recursos', 'logo_small.png')
 pdfviewer = os.path.join(os.getcwd(), 'recursos', 'SumatraPDF.exe')
 arq_recibo = 'recibo.pdf'
 arq_relatorio = 'relatorio.pdf'
+arq_lista = 'lista.pdf'
 
 
 # INICIO FUNCAO GERA RECIBO
@@ -61,6 +62,55 @@ def gera_recibo_pdf(nome, valorpago, datapgto, datavencto, atraso, usuario):
     # rpdf.cell(60, 10, 'Powered by FPDF.', 0, 1, 'C')
     # rpdf.output(arq_recibo, 'F')
     rpdf.output(arq_recibo)
+
+
+# IMPRIME UMA LISTA DE NOMES DE ALUNO E SEUS DIAS DE VENCIMENTO
+def gera_lista_pdf(lista):
+    rpdf = FPDF('P', 'cm', 'A4')
+    rpdf.add_page()
+    rpdf.add_font('Roboto', '', 'Roboto-Regular.ttf', uni=True)
+    rpdf.add_font('Roboto', 'I', 'Roboto-MediumItalic.ttf', uni=True)
+    rpdf.add_font('Roboto', 'B', 'Roboto-Medium.ttf', uni=True)
+    rpdf.add_font('RobotoBold', 'B', 'Roboto-Bold.ttf', uni=True)
+    rpdf.set_font('RobotoBold', 'B', 14)
+    rpdf.image(imagem_peq, 16.6, 1.6)
+    rpdf.rect(1, 1, 19, 3.5, 'D')
+    rpdf.cell(0, 0.6, '', 0, 2, 'C')
+    rpdf.cell(0, 0.6, 'LISTA DE ALUNOS ATIVOS', 0, 2, 'C')
+    rpdf.set_font('Roboto', 'B', 14)
+    rpdf.cell(0, 0.6, 'Lótus Condicionamento Dinâmico Integrado', 0, 2, 'C')
+    rpdf.cell(0, 0.6, 'Andréia de Cássia Gonçalves (CREF 020951-G/MG)', 0, 2, 'C')
+    rpdf.set_font('Roboto', 'I', 14)
+    rpdf.cell(0, 0.6, 'Rua Coronel Paiva, 12  Centro  Ouro Fino MG', 0, 2, 'C')
+    # rpdf.line(1, 4.5, 20, 4.5)
+    rpdf.set_font('Roboto', 'B', 14)
+    rpdf.cell(0.5, 1, '', 0, 1)
+    rpdf.cell(0.1, 1, '')
+    rpdf.cell(2, 1, 'Índice')
+    rpdf.cell(0.5, 1, '')
+    rpdf.cell(12.5, 1, 'Nome')
+    rpdf.cell(4.7, 1, 'Vencimento', 0, 1)
+    rpdf.set_font('Roboto', '', 14)
+    tempx = 6
+    for idx, x in enumerate(lista):
+        rpdf.cell(0.5, 0.6, '')
+        tempstr = str(x[0])
+        rpdf.cell(0.5, 0.6, tempstr, 0, 0, 'R')
+        rpdf.cell(1.5, 0.6, '')
+        tempstr = str(x[1])
+        rpdf.cell(13.8, 0.6, tempstr)
+        tempstr = str(x[2])
+        rpdf.cell(5, 0.6, tempstr, 0, 1)
+        tempx = tempx + 0.6
+        rpdf.line(1, tempx, 20, tempx)
+        if tempx == 27.00000000000002:
+            tempx = -0.25
+        print(x[0], 'tempx ', tempx)
+    # rpdf.cell(19, 10, 'Hello World!', 1)
+    # rpdf.cell(40, 10, 'Hello World!', 1)
+    # rpdf.cell(60, 10, 'Powered by FPDF.', 0, 1, 'C')
+    # rpdf.output(arq_recibo, 'F')
+    rpdf.output(arq_lista)
 
 
 def gera_relatorio_pdf(mes, ano, valortotal, templist):

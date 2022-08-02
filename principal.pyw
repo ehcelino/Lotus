@@ -24,6 +24,7 @@ import cores
 # from tkhtmlview import *
 from fpdf import FPDF
 import pdfgen
+
 # import pandas as pd
 
 ################################################################
@@ -41,6 +42,11 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
+# MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
+# CONTABIL TÁ DANDO O VALOR RECEBIDO ERRADO
+# OK INCLUIR NO CADASTRO DE ALUNOS UM SELETOR DE DATA, CASO CADASTRE NO MES ANTERIOR
+# OK CORES DE ALUNOS EM ATRASO NA TABELA ESTÃO ERRADAS
+# MENSALIDADE EM ATRASO ANTES DO VENCIMENTO
 # MAIS OU MENOS OK - PODE MELHORAR DESCONTO FAMILIA!!!
 # - intervalos - marcar quantos dias até a pessoa retornar do intervalo
 # OK planos - planos de 3 meses pré pagos para vender
@@ -54,7 +60,8 @@ import pdfgen
 
 log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 formatter = logging.Formatter(log_format)
-logging.basicConfig(filename='errorlog.txt', level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logging.basicConfig(filename='errorlog.txt', level=logging.DEBUG, format='%(asctime)s %(message)s',
+                    datefmt='%d/%m/%Y %H:%M:%S')
 # sg.theme(sg.user_settings_get_entry('-tema-', 'DarkBlue2'))
 
 # sg.set_options(use_custom_titlebar=True)
@@ -247,10 +254,17 @@ def mensalidades_atraso(index):
     comando = 'SELECT * FROM ' + nometabela
     c.execute(comando)
     cdados = c.fetchall()
+    print(cdados)
     if cdados:
         for idx, x in enumerate(cdados):
             if x[8] != 1:
-                mensatraso.append(x[1])
+                if x[1]:
+                    if x[2]:
+                        tmpdia = int(x[2]) + 10
+                        tmpdata = datetime.strptime((str(tmpdia) + '/' + x[1]), '%d/%m/%Y')
+                        if tmpdata < datetime.now():
+                            mensatraso.append(x[1])
+    print('Index: ', index, ' mensatraso: ', mensatraso)
     conexao.close()
     return mensatraso
 
@@ -539,6 +553,17 @@ def alunos_ultimo():
     #        print(linha)
     conexao.close()
     return dados
+
+
+#  RETORNA O NOME E A DATA DE VENCIMENTO DE TODOS OS ALUNOS ATIVOS
+def alunos_nomeven():
+    temp_tabela = ler_todos_dados_ativos()
+    resultado = []
+    for idx, x in enumerate(temp_tabela):
+        resultado.append([x[0], x[1], x[7]])
+        # INDICE, NOME, DT VENCTO
+    print(resultado)
+    return resultado
 
 
 # INICIO FUNCAO MES ATUAL
@@ -1063,7 +1088,6 @@ def sort_table(table, cols):
 # JANELA CONFIGURACOES
 
 class Configuracoes:
-
     """
     DEFINICOES:
     '-cormensatraso-' = COR DE REALCE DO ALUNO COM MENSALIDADE EM ATRASO NA TABELA PRINCIPAL
@@ -1293,6 +1317,7 @@ class grafico_mensal:
     espacamento = 30  # space between each bar
     borda = 3  # offset from the left edge for first bar
     tamanho = (400, 300)
+    primeiro = True
 
     def __init__(self):
         self.graph_value = None
@@ -1308,13 +1333,15 @@ class grafico_mensal:
         self.layoutframe = [
             [sg.Graph(self.tamanho, (0, 0),
                       (self.tamanho[0], self.tamanho[1]),
-                      k='-GRAFICO-', background_color='beige')]
+                      k='-GRAFICO-', background_color='beige', drag_submits=True)]
         ]
         self.layout = [
             [sg.Image(source=icones[0]),
              sg.Text('Mensalidades em gráfico', font='_ 25', key='-NOMEALUNO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Percentual de mensalidades')],
+            [sg.T('Mês:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True)],
+            # EDITANDO OOOOoooOOOoooOO
             # [sg.Text('Mês:'), sg.I(k='-MES-', s=(10, 1))],
             [sg.Text('Mensalidades recebidas:'), sg.Text('', k='-REC-', background_color='green'),
              sg.Push(), sg.Text('Mensalidades em haver:'), sg.Text('', k='-HAV-', background_color='red')],
@@ -1327,29 +1354,79 @@ class grafico_mensal:
 
     def run(self):
         while True:
-            porcentagens = mensalidades_porcentagem(datetime.strftime(datetime.now(), '%m/%Y'))
-            self.pagos = porcentagens[0]
-            self.npagos = porcentagens[1]
-            self.window['-REC-'].update(str(round(self.pagos)) + '%')
-            self.window['-HAV-'].update(str(round(self.npagos)) + '%')
-            self.graph.erase()
+            if self.primeiro:
+                porcentagens = mensalidades_porcentagem(datetime.strftime(datetime.now(), '%m/%Y'))
+                self.pagos = porcentagens[0]
+                self.npagos = porcentagens[1]
+                self.window['-REC-'].update(str(round(self.pagos)) + '%')
+                self.window['-HAV-'].update(str(round(self.npagos)) + '%')
+                self.graph.erase()
 
-            # self.graph_value = 100
+                # self.graph_value = 100
 
-            # self.graph.draw_rectangle(top_left=(self.espacamento + self.borda, self.graph_value),
-            #                           bottom_right=(self.espacamento + self.borda + self.larg_barra, 0),
-            #                           fill_color='green', line_width=0)
-            esquerda = 140
-            self.graph.draw_rectangle(top_left=(esquerda, self.pagos + 150),
-                                      bottom_right=(esquerda + self.larg_barra, 75),
-                                      fill_color='green', line_width=0)
+                # self.graph.draw_rectangle(top_left=(self.espacamento + self.borda, self.graph_value),
+                #                           bottom_right=(self.espacamento + self.borda + self.larg_barra, 0),
+                #                           fill_color='green', line_width=0)
+                esquerda = 140
+                self.graph.draw_rectangle(top_left=(esquerda, self.pagos + 75),
+                                          bottom_right=(esquerda + self.larg_barra, 75),
+                                          fill_color='green', line_width=0)
 
-            self.graph.draw_rectangle(top_left=(self.larg_barra + esquerda + self.espacamento, self.npagos + 150),
-                                      bottom_right=(self.larg_barra + esquerda + self.larg_barra +
-                                                    self.espacamento, 75), fill_color='red', line_width=0)
-            self.graph.draw_text('Pagas', (esquerda + 24, 70), color='green')
-            self.graph.draw_text('Não pagas', (esquerda + self.larg_barra + self.espacamento + 25, 70), color='red')
+                self.graph.draw_rectangle(top_left=(self.larg_barra + esquerda + self.espacamento, self.npagos + 75),
+                                          bottom_right=(self.larg_barra + esquerda + self.larg_barra +
+                                                        self.espacamento, 75), fill_color='red', line_width=0)
+                self.graph.draw_text('Pagas', (esquerda + 24, 70), color='green')
+                self.graph.draw_text('Não pagas', (esquerda + self.larg_barra + self.espacamento + 25, 70), color='red')
+                self.primeiro = False
+
             self.event, self.values = self.window.read()
+            print(self.event, self.values)
+
+            mes = '0'
+            if self.values['-MES-'].rstrip() == 'Janeiro':
+                mes = '01'
+            elif self.values['-MES-'].rstrip() == 'Fevereiro':
+                mes = '02'
+            elif self.values['-MES-'].rstrip() == 'Março':
+                mes = '03'
+            elif self.values['-MES-'].rstrip() == 'Abril':
+                mes = '04'
+            elif self.values['-MES-'].rstrip() == 'Maio':
+                mes = '05'
+            elif self.values['-MES-'].rstrip() == 'Junho':
+                mes = '06'
+            elif self.values['-MES-'].rstrip() == 'Julho':
+                mes = '07'
+            elif self.values['-MES-'].rstrip() == 'Agosto':
+                mes = '08'
+            elif self.values['-MES-'].rstrip() == 'Setembro':
+                mes = '09'
+            elif self.values['-MES-'].rstrip() == 'Outubro':
+                mes = '10'
+            elif self.values['-MES-'].rstrip() == 'Novembro':
+                mes = '11'
+            elif self.values['-MES-'].rstrip() == 'Dezembro':
+                mes = '12'
+
+            if self.event == '-MES-':
+                print(mes + datetime.strftime(datetime.now(), '/%Y'))
+                porcentagens = mensalidades_porcentagem(mes + datetime.strftime(datetime.now(), '/%Y'))
+                self.pagos = porcentagens[0]
+                self.npagos = porcentagens[1]
+                self.window['-REC-'].update(str(round(self.pagos)) + '%')
+                self.window['-HAV-'].update(str(round(self.npagos)) + '%')
+                self.graph.erase()
+                esquerda = 140
+                self.graph.draw_rectangle(top_left=(esquerda, self.pagos + 75),
+                                          bottom_right=(esquerda + self.larg_barra, 75),
+                                          fill_color='green', line_width=0)
+
+                self.graph.draw_rectangle(top_left=(self.larg_barra + esquerda + self.espacamento, self.npagos + 75),
+                                          bottom_right=(self.larg_barra + esquerda + self.larg_barra +
+                                                        self.espacamento, 75), fill_color='red', line_width=0)
+                self.graph.draw_text('Pagas', (esquerda + 24, 70), color='green')
+                self.graph.draw_text('Não pagas', (esquerda + self.larg_barra + self.espacamento + 25, 70), color='red')
+
             if self.event in (sg.WIN_CLOSED, '-VOLTAR-'):
                 break
         self.window.close()
@@ -1877,7 +1954,7 @@ class Principal:
                       'Informações do aluno', 'Financeiro', 'Lembretes', '---', '&Sair']],
         # 'Save::savekey',
         ['&Editar', ['Configurações', 'Mudar tema', '---', 'Planos'], ],
-        ['&Relatórios', ['Recebimento', 'Devedores', 'Gráfico']],
+        ['&Relatórios', ['Recebimento', 'Devedores', 'Gráfico', 'Lista de alunos(imprime)']],
         ['&Ferramentas', ['Backup parcial', 'Backup completo', 'Administração', ['Limpar banco de dados']]],
         ['A&juda', ['Tela principal', 'Sobre...']], ]
     # ALTMENU
@@ -1930,8 +2007,10 @@ class Principal:
                           text_color=sg.theme_text_color(), disabled=True)]
         ]
         self.frame1 = [
-            [sg.T('    ', background_color='coral4'), sg.T('Mensalidade em atraso'),
-             sg.T('    ', background_color='slateblue'), sg.T('Plano próximo de acabar')]
+            [sg.T('    ', background_color=sg.user_settings_get_entry('-cormensatraso-')),
+             sg.T('Mensalidade em atraso'),
+             sg.T('    ', background_color=sg.user_settings_get_entry('-corplanofinal-')),
+             sg.T('Plano próximo de acabar')]
         ]
 
         self.layout = [
@@ -2009,17 +2088,19 @@ class Principal:
                 self.window['-STATUS-'].update('Último backup realizado há ' + str(tempobkp) + ' dias atrás.')
 
             tmptabela = self.window['-TABELA-'].Values
-            # print(self.window['-TABELA-'].Values)
+            print(self.window['-TABELA-'].Values)
             if self.sort:
                 tabela_final = sort_table(tmptabela, (1,))
                 self.window['-TABELA-'].Update(values=tabela_final)
                 self.sort = False
+            tmptabela = self.window['-TABELA-'].Values
             if self.atrasados:
                 indice = 0
                 for idx, x in enumerate(tmptabela):
                     atrasado = mensalidades_atraso(x[0])
                     if atrasado:
-                        self.window['-TABELA-'].Update(row_colors=[[indice, 'coral4']])
+                        self.window['-TABELA-'].Update(
+                            row_colors=[[indice, sg.user_settings_get_entry('-cormensatraso-')]])
                         # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
                     indice = indice + 1
                 self.atrasados = False
@@ -2036,7 +2117,8 @@ class Principal:
                         print(deltafim.days)
                         diasfim = int(deltafim.days)
                         if diasfim < 30:
-                            self.window['-TABELA-'].Update(row_colors=[[indice, 'slateblue']])
+                            self.window['-TABELA-'].Update(
+                                row_colors=[[indice, sg.user_settings_get_entry('-corplanofinal-')]])
                             # self.window['-CAIXA-'].print(
                             #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
                         self.planos_acabando.append((x[0], diasfim))
@@ -2059,6 +2141,12 @@ class Principal:
                 if opcao == 'Sim':
                     sg.user_settings_set_entry('-location-', self.window.current_location())
                     break
+
+            if self.event == 'Lista de alunos(imprime)':
+                pdfgen.gera_lista_pdf(alunos_nomeven())
+                self.window.perform_long_operation(
+                    lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_lista),
+                    '-FUNCTION COMPLETED-')
 
             if self.event == 'Configurações':
                 objconf = Configuracoes()
@@ -2754,7 +2842,7 @@ class Principal:
                             self.planoinfo = True
                             self.atrasados = False
                             self.planos_fim = False
-                            # EDITANDO oooOOOOoooOOOOooo
+
                             mesano = datetime.strftime(datainicio, '%m/%Y')
                             # mensalidades_insere(self.indiceinfo, mesano, diavencto, valorfinal,
                             #                    datetime.strftime(datetime.now(), '%d/%m/%Y'),
@@ -2940,7 +3028,8 @@ class Principal:
                                                 str(self.dadosinfo[self.rowinfo[0]][0]),
                                                 str(self.dadosinfo[self.rowinfo[0]][4]))
                                 self.windowinfo.perform_long_operation(
-                                    lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_recibo), '-FUNCTION COMPLETED-')
+                                    lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_recibo),
+                                    '-FUNCTION COMPLETED-')
                             # os.system(arq_recibo)
                             #    print('dadosinfo[rowinfo]:',dadosinfo[rowinfo[0]])
                             #    print('rowinfo INDEX:',dadosinfo[rowinfo[0]][0])
@@ -3523,15 +3612,13 @@ class RelatorioMensal:
                 self.window['-TOTAL-'].update(locale.currency(val_rec))
                 self.window['-IMPRIME-'].update(disabled=False)
 
-            if self.event == '-IMPRIME-':  # EDITANDO OOooOOO
+            if self.event == '-IMPRIME-':
                 pdfgen.gera_relatorio_pdf(
                     str(self.values['-MES-'].rstrip()), self.values['-ANO-'].rstrip(),
                     self.values['-TOTAL-'].rstrip(), mensalidades_relatorio(mesano))
 
                 self.window.perform_long_operation(lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_relatorio),
                                                    '-FUNCTION COMPLETED-')
-
-
 
         self.window.close()
 
