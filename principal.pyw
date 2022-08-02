@@ -42,8 +42,10 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
+# MULTA NA FUNCAO RECEBER MENSALIDADE NAO ESTA FUNCIONANDO
+# OK FUNCAO mensalidades_historico - fazer retornar o valor pago como moeda
 # MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
-# CONTABIL TÁ DANDO O VALOR RECEBIDO ERRADO
+# OK CONTABIL TÁ DANDO O VALOR RECEBIDO ERRADO
 # OK INCLUIR NO CADASTRO DE ALUNOS UM SELETOR DE DATA, CASO CADASTRE NO MES ANTERIOR
 # OK CORES DE ALUNOS EM ATRASO NA TABELA ESTÃO ERRADAS
 # MENSALIDADE EM ATRASO ANTES DO VENCIMENTO
@@ -426,6 +428,32 @@ def mensalidades_porcentagem(mesano):
     print('Pagos: ', f_pago)
     print('Não pagos: ', f_npago)
     return f_pago, f_npago, qtd_alunos
+
+
+# FUNCAO QUE OCUPA O LUGAR DE BUSCA_DADOS_FINANCEIROS
+def mensalidades_historico(indice):
+    # RETORNA indice, data pagto, atraso, valor, valor pago
+    nometabela = 'mens_' + str(indice)
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
+    comando = 'SELECT me_index, me_datapgto, me_atraso, me_vlrpago FROM ' + nometabela + ' WHERE me_pg = 1'
+    c.execute(comando)
+    mensalidades = c.fetchall()
+    mensalidades_moeda = []
+    for idx, x in enumerate(mensalidades):
+        tmp = locale.currency(float(x[3]))
+        mensalidades_moeda.append([x[0], x[1], x[2], tmp])
+    dadoscolunas = []
+    for idx, x in enumerate(mensalidades_moeda):
+        dadoslinha = []
+        for idi, i in enumerate(x):
+            i = xstr(i)
+            dadoslinha.append(i)
+            # print(dadoslinha)
+        dadoscolunas.append(dadoslinha)
+    conexao.close()
+    # RETORNA indice, data pagto, atraso, valor, valor pago.
+    return dadoscolunas
 
 
 # FUNCAO LE A TABELA OPCAO
@@ -2617,8 +2645,8 @@ class Principal:
                                        ),
                                 sg.Tab('Mensalidades',
                                        [
-                                           # [sg.Text('Mensalidades')],
-                                           [sg.Table(values=busca_dados_financeiros(self.indiceinfo),
+                                           # [sg.Text('Mensalidades')], # EDITANDO OOOOOooooOOOO
+                                           [sg.Table(values=mensalidades_historico(self.indiceinfo),
                                                      headings=self.tblheadinfo,
                                                      visible_column_map=[False, True, True, True, True],
                                                      # sg.Table(values=busca_dadosinfo_financeiros(self.indiceinfo),headings=self.tblheadinfo,
@@ -2880,11 +2908,12 @@ class Principal:
                                 if opcao == 'Sim':
                                     apaga_dados_financeiros(self.dadosinfo[self.rowinfo[0]][0],
                                                             self.dadosinfo[self.rowinfo[0]][1])
+                                    # self.windowinfo['-TABELAPG-'].update(
+                                    #     valuesinfo=busca_dados_financeiros(self.indiceinfo))
                                     self.windowinfo['-TABELAPG-'].update(
-                                        valuesinfo=busca_dados_financeiros(self.indiceinfo))
-
+                                        valuesinfo=mensalidades_historico(self.indiceinfo))
                         if self.eventinfo == '-POP-' or self.eventinfo == '-group2-':
-                            self.windowinfo['-TABELAPG-'].update(busca_dados_financeiros(self.indiceinfo))
+                            self.windowinfo['-TABELAPG-'].update(mensalidades_historico(self.indiceinfo))
 
                         ##########################################
                         # CHECAGEM DE VALORES
