@@ -1085,7 +1085,7 @@ def diferenca_datas(date1, date2):
 # FINAL FUNCAO CALCULA DIFERENCA ENTRE DATAS RETORNA DIAS
 
 # FUNCAO GERA DATA VENCIMENTO
-def geravencto(datavencto):
+def geravencto(datavencto):  # EDITANDO - CHECAR SE ESSA FUNCAO FAZ SENTIDO
     tdata = date.today()
     mesano = tdata.strftime("%m/%Y")
     datavencimento = (str(datavencto) + '/' + mesano)
@@ -1369,7 +1369,7 @@ class grafico_mensal:
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Percentual de mensalidades')],
             [sg.T('Mês:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True)],
-            # EDITANDO OOOOoooOOOoooOO
+
             # [sg.Text('Mês:'), sg.I(k='-MES-', s=(10, 1))],
             [sg.Text('Mensalidades recebidas:'), sg.Text('', k='-REC-', background_color='green'),
              sg.Push(), sg.Text('Mensalidades em haver:'), sg.Text('', k='-HAV-', background_color='red')],
@@ -1713,6 +1713,7 @@ class Receber:
                 try:
                     self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
                                                       self.window['-DATAPAGTO-'].get())
+                    print('Dias atraso: ', self.diasatraso)
                 except Exception as Argument:
                     logging.error(str(Argument))
                 self.window['-ATRASO-'].update(self.diasatraso)
@@ -1791,6 +1792,7 @@ class Receber:
 
             if self.event == '-ATRASO0-':
                 self.ematraso = True
+                self.window['-APLMULTA-'].update(value=False)
                 mesano2 = str(self.window['-ATRASO0-'].get())
                 self.mesano = str(self.window['-ATRASO0-'].get())
                 atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
@@ -1805,13 +1807,29 @@ class Receber:
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
                 self.vlrmensal = float(atrasado[3])
                 self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
-                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
-                                                  self.window['-DATAPAGTO-'].get())
+                datatmp = atrasado[2] + '/' + atrasado[1]
+                self.diasatraso = diferenca_datas(datatmp,
+                                                  self.window['-DATAPAGTO-'].get())  # EDITANDO DIAS ATRASO
+                print('Dias atraso: ', self.diasatraso)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
                 if self.diasatraso > 5:
+                    valorstr = str(self.vlrmensal)
+                    # print(resultado[idx])
+                    # valorstr = valorstr.replace(',', '.')
+                    self.vlrmulta = float(valorstr) * 0.02
+                    self.vlrmultastr = str(self.vlrmulta)
+                    self.vlrmultastr = self.vlrmultastr.replace('.', ',')
+                    self.vlrmultastr = self.vlrmultastr + '0'
+                    # valorfin = float(valorstr) + vlrmulta
+                    # vlrfnstr = str(valorfin)
+                    # vlrfnstr = vlrfnstr.replace('.', ',')
+                    # vlrfnstr = vlrfnstr + '0'
+                    # self.window['-VALMULTA-'].update(self.vlrmultastr)
                     self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
-                    self.window['-APLMULTA-'].update(text_color='Red')
+                    if self.window['-VALMULTA-'] != '':
+                        self.window['-APLMULTA-'].update(text_color='Red')
+                        # self.window['-APLMULTA-'].update(value=True)
                 mens = 'Mensalidade de ' + self.mesano
                 tmpappend = []
                 tmpappend = [99, self.datapagto, mens,
@@ -1821,8 +1839,10 @@ class Receber:
                 self.vendastbl.append(tmpappend)
                 self.window['-TABELA-'].update(values=self.vendastbl)
 
+
             if self.event == '-ATRASO1-':
                 self.ematraso = True
+                self.window['-APLMULTA-'].update(value=False)
                 mesano2 = str(self.window['-ATRASO1-'].get())
                 self.mesano = str(self.window['-ATRASO1-'].get())
                 atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
@@ -1837,13 +1857,29 @@ class Receber:
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
                 self.vlrmensal = float(atrasado[3])
                 self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
-                self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
-                                                  self.window['-DATAPAGTO-'].get())
+                datatmp = atrasado[2] + '/' + atrasado[1]
+                self.diasatraso = diferenca_datas(datatmp,
+                                                  self.window['-DATAPAGTO-'].get())  # EDITANDO DIAS ATRASO
+                print('Dias atraso: ', self.diasatraso)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
                 if self.diasatraso > 5:
+                    valorstr = str(self.vlrmensal)
+                    # print(resultado[idx])
+                    # valorstr = valorstr.replace(',', '.')
+                    self.vlrmulta = float(valorstr) * 0.02
+                    self.vlrmultastr = str(self.vlrmulta)
+                    self.vlrmultastr = self.vlrmultastr.replace('.', ',')
+                    self.vlrmultastr = self.vlrmultastr + '0'
+                    # valorfin = float(valorstr) + vlrmulta
+                    # vlrfnstr = str(valorfin)
+                    # vlrfnstr = vlrfnstr.replace('.', ',')
+                    # vlrfnstr = vlrfnstr + '0'
+                    # self.window['-VALMULTA-'].update(self.vlrmultastr)
                     self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
-                    self.window['-APLMULTA-'].update(text_color='Red')
+                    if self.window['-VALMULTA-'] != '':
+                        self.window['-APLMULTA-'].update(text_color='Red')
+                        # self.window['-APLMULTA-'].update(value=True)
                 mens = 'Mensalidade de ' + self.mesano
                 tmpappend = []
                 tmpappend = [99, self.datapagto, mens,
@@ -1854,15 +1890,17 @@ class Receber:
                 self.window['-TABELA-'].update(values=self.vendastbl)
 
             if self.event == '-DATAPAGTO-':
-                try:
+                if self.ematraso:
+                    atrasado = mensalidades_ler_atrasado(self.indicealuno, self.mesano)
+                    self.diasatraso = diferenca_datas(self.datavencto,
+                                                      self.window['-DATAPAGTO-'].get())
+                else:
                     self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
                                                       self.window['-DATAPAGTO-'].get())
-                    self.window['-DINV-'].update(visible=False)
-                    self.window['-CONF-'].update(disabled=False)
-                except Exception as Argument:
-                    logging.error(str(Argument))
-                    self.window['-DINV-'].update(visible=True)
-                    self.window['-CONF-'].update(disabled=True)
+                self.window['-DINV-'].update(visible=False)
+                self.window['-CONF-'].update(disabled=False)
+                self.window['-DINV-'].update(visible=True)
+                self.window['-CONF-'].update(disabled=True)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
                 mens = 'Mensalidade de ' + self.mesano
