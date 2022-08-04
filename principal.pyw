@@ -42,7 +42,10 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
+# COMPRA NAO APARECE NA MENSALIDADE ATRASADA, MAS E CONTADO O VALOR
+# OK IMPLEMENTAR DESCONTO BOM PAGADOR
 # MULTA NA FUNCAO RECEBER MENSALIDADE NAO ESTA FUNCIONANDO
+# FUNCAO PRA IMPRIMIR LISTA DE ALUNOS DEVEDORES
 # OK FUNCAO mensalidades_historico - fazer retornar o valor pago como moeda
 # MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
 # OK CONTABIL TÁ DANDO O VALOR RECEBIDO ERRADO
@@ -57,6 +60,7 @@ import pdfgen
 # OK mudar a cor da linha na tabela quando um aluno estiver em pausa
 # OK mudar a cor da linha quando um aluno estiver com um plano
 # - VALIDACAO de dados em todos os campos de entrada
+# TRANSFORMAR O PAGTO DE MENSALIDADES EM UMA TABELA
 ################################################################
 
 
@@ -96,7 +100,7 @@ ajuda = ''
 regexTelefone = re.compile(r'^\(?[1-9]{2}\)? ?(?:[2-8]|9[1-9])[0-9]{3}(\-|\.)?[0-9]{4}$')  # OK
 # ORIGINAL PARA TELEFONE: ^\(?[1-9]{2}\)? ?(?:[2-8]|9[1-9])[0-9]{3}\-?[0-9]{4}$
 regexCPF = re.compile(r'\d{3}\.\d{3}\.\d{3}\-\d{2}')
-regexDinheiro = re.compile(r'^(\d{1,}\d+\,\d{2}?)$')  # OK
+regexDinheiro = re.compile(r'^(\d{1,}\,\d{2}?)$')  # OK
 regexEmail = re.compile(r'^[\w\.]+@([\w-]+\.)+[\w-]{2,4}$')  # OK
 regexDia = re.compile(r'\b[0-3]{0,1}[0-9]{1}\b')  # OK
 # arq_recibo = 'recibo.pdf'
@@ -163,6 +167,64 @@ def novobanco():
 
 
 # FINAL FUNCAO RECRIA BANCO DE DADOS
+
+# FUNCAO VALIDA CPF
+
+def valida_cpf(cpf: str) -> bool:
+    """ Efetua a validação do CPF, tanto formatação quando dígito verificadores.
+    Retirada de: https://pt.stackoverflow.com/questions/64608/
+    como-validar-e-calcular-o-d%C3%ADgito-de-controle-de-um-cpf
+
+    Parâmetros:
+        cpf (str): CPF a ser validado
+
+    Retorno:
+        bool:
+            - Falso, quando o CPF não possuir o formato 999.999.999-99;
+            - Falso, quando o CPF não possuir 11 caracteres numéricos;
+            - Falso, quando os dígitos verificadores forem inválidos;
+            - Verdadeiro, caso contrário.
+
+    Exemplos:
+
+   # >>> valida_cpf('529.982.247-25')
+    True
+   # >>> valida_cpf('52998224725')
+    False
+   # >>> valida_cpf('111.111.111-11')
+    False
+    """
+
+    # Verifica a formatação do CPF
+    if not re.match(r'\d{3}\.\d{3}\.\d{3}-\d{2}', cpf):
+        return False
+
+    # Obtém apenas os números do CPF, ignorando pontuações
+    numbers = [int(digit) for digit in cpf if digit.isdigit()]
+
+    # Verifica se o CPF possui 11 números ou se todos são iguais:
+    if len(numbers) != 11 or len(set(numbers)) == 1:
+        return False
+
+    # Validação do primeiro dígito verificador:
+    sum_of_products = sum(a * b for a, b in zip(numbers[0:9], range(10, 1, -1)))
+    expected_digit = (sum_of_products * 10 % 11) % 10
+    if numbers[9] != expected_digit:
+        return False
+
+    # Validação do segundo dígito verificador:
+    sum_of_products = sum(a * b for a, b in zip(numbers[0:10], range(11, 1, -1)))
+    expected_digit = (sum_of_products * 10 % 11) % 10
+    if numbers[10] != expected_digit:
+        return False
+
+    return True
+
+
+# FINAL FUNCAO VALIDA CPF
+
+
+
 
 # FUNCAO VERIFICA SE TABELA EXISTE
 def tableexists(dbcon, tablename):
@@ -262,8 +324,9 @@ def mensalidades_atraso(index):
             if x[8] != 1:
                 if x[1]:
                     if x[2]:
-                        tmpdia = int(x[2]) + 10
+                        tmpdia = int(x[2])
                         tmpdata = datetime.strptime((str(tmpdia) + '/' + x[1]), '%d/%m/%Y')
+                        tmpdata = tmpdata + relativedelta(days=+10)
                         if tmpdata < datetime.now():
                             mensatraso.append(x[1])
     print('Index: ', index, ' mensatraso: ', mensatraso)
@@ -1112,6 +1175,14 @@ def sort_table(table, cols):
             sg.popup_error('Error in sort_table', 'Exception in sort_table', e)
     return table
 
+# def validar_data(date_text):
+#    try:
+#        if date_text != datetime.strptime(date_text, "%Y-%m-%d").strftime('%Y-%m-%d'):
+#            raise ValueError
+#        return True
+#    except ValueError:
+#        return False
+
 
 # JANELA CONFIGURACOES
 
@@ -1140,6 +1211,15 @@ class Configuracoes:
         ]
 
         self.coluna2 = [
+            [sg.Frame('Financeiro', layout=[
+                [sg.T('Desconto bom pagador')],
+                [sg.T('Digite o valor em Reais ou zero para não usar o desconto.')],
+                [sg.T('Valor R$:'), sg.I(k='-VALOR-', s=(20, 1)), sg.Push(), sg.B('Gravar', k='-GRAVA-')],
+
+            ])]
+        ]
+
+        self.coluna3 = [
             [sg.Frame('Backup', layout=[
                 [sg.Checkbox('Fazer backup automático?')],
                 [sg.T('Período: a cada'), sg.I(k='-PER-', s=(5, 1)), sg.T('dias.')],
@@ -1153,6 +1233,7 @@ class Configuracoes:
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Column(self.coluna1)],
             [sg.Column(self.coluna2)],
+            [sg.Column(self.coluna3)],
             # [sg.Frame('', self.layframe)],
             [sg.Push(), sg.Button('Fechar', k='-FECHAR-')]
         ]
@@ -1168,6 +1249,11 @@ class Configuracoes:
             tmp = sg.user_settings_get_entry('-corplanofinal-')
             self.window['-CPLA-'].update(tmp)
             self.window['-CPLA-'].update(background_color=tmp)
+            tmp = sg.user_settings_get_entry('-valordesconto-')
+            tmp2 = str(tmp) + '0'
+            tmp2 = tmp2.replace('.', ',')
+            self.window['-VALOR-'].update(tmp2)
+
             self.event, self.values = self.window.read()
 
             if self.event == '-COR1-':
@@ -1185,6 +1271,19 @@ class Configuracoes:
                 valor = self.window['-CPLA-'].get()
                 print(valor)
                 sg.user_settings_set_entry('-corplanofinal-', valor)
+
+            if self.event == '-GRAVA-':
+                valor = self.values['-VALOR-'].rstrip()
+                if self.values['-VALOR-'].rstrip() == '':
+                    sg.popup('Campo valor do desconto não pode ser vazio.')
+                elif self.values['-VALOR-'].rstrip() != '' and not \
+                        re.fullmatch(regexDinheiro, self.values['-VALOR-'].rstrip()):
+                    sg.popup('Valor do desconto deve ser no formato xxx,xx')
+                else:
+                    valor = valor.replace(',', '.')
+                    valorf = float(valor)
+                    sg.user_settings_set_entry('-valordesconto-', valorf)
+                    sg.popup('Valor do desconto alterado com sucesso.')
 
             if self.event in (sg.WIN_CLOSED, '-FECHAR-'):
                 break
@@ -1619,6 +1718,8 @@ class Receber:
     ematraso = False
     vfinalmulta = 0.0
     vlrmsldorig = True
+    desconto = float
+    temdesconto = False
 
     def __init__(self):
         self.datapagto = None
@@ -1632,7 +1733,8 @@ class Receber:
             [sg.pin(sg.Text('Em atraso (clique para efetuar o pagamento): ',
                             k='-LBLATRASO-', visible=False, font='default 10 bold')),
              sg.Text('', k='-ATRASO0-', enable_events=True, font='default 10 underline', text_color='blue'),
-             sg.Text('', k='-ATRASO1-', enable_events=True, font='default 10 underline', text_color='blue')],
+             sg.Text('', k='-ATRASO1-', enable_events=True, font='default 10 underline', text_color='blue'),
+             sg.Text('', k='-ATRASO2-', enable_events=True, font='default 10 underline', text_color='blue')],
             [sg.HorizontalSeparator(k='-SEPATRASO-')],
             [sg.Text('Vencimento:', size=self.tam_texto), sg.Input(k='-DATAVEN-', size=self.tam_input, disabled=True),
              sg.Push(), sg.Text('Valor:', size=self.tam_texto),
@@ -1644,6 +1746,7 @@ class Receber:
              sg.pin(sg.T('DATA INVÁLIDA', k='-DINV-', visible=False, text_color='red', font='_ 10 bold')),
              sg.Push(), sg.Text('Atraso:', size=self.tam_texto),
              sg.Input(k='-ATRASO-', size=self.tam_input, disabled=True)],
+            [sg.T('Desconto:', size=self.tam_texto), sg.I(k='-DESCONTO-', size=self.tam_input)],
             [sg.Text('Multa:', self.tam_texto), sg.Input(k='-VALMULTA-', size=self.tam_input, disabled=True),
              sg.Checkbox('Aplica multa?', default=False, k='-APLMULTA-', enable_events=True),
              sg.Push(), sg.Text('Usuário:', size=self.tam_texto),
@@ -1684,6 +1787,7 @@ class Receber:
 
         self.window['-ATRASO0-'].set_cursor(cursor='hand2')
         self.window['-ATRASO1-'].set_cursor(cursor='hand2')
+        self.window['-ATRASO2-'].set_cursor(cursor='hand2')
 
     def run(self):
         while True:
@@ -1706,10 +1810,20 @@ class Receber:
                 self.datavencto = \
                     str(buscar_aluno_index(self.indicealuno)[7]) + '/' + datetime.strftime(datetime.now(), '%m/%Y')
                 self.window['-DATAVEN-'].update(self.datavencto)
+                self.desconto = sg.user_settings_get_entry('-valordesconto-')
+                dataven = datetime.strptime(self.datavencto, '%d/%m/%Y')
+                #
                 # diasatraso = diferenca_datas(geravencto(self.values['-DATAVEN-'].rstrip()),
                 #                              self.values['-DATAPAGTO-'].rstrip())
                 print('DATAPAGTO ', self.window['-DATAPAGTO-'].get())
                 self.datapagto = self.window['-DATAPAGTO-'].get()
+                datapg = datetime.strptime(self.datapagto, '%d/%m/%Y')
+                print('dataven ', dataven)
+                print('datapg ', datapg)
+                if dataven > datapg:
+                    print('entrou no if do desconto')
+                    self.temdesconto = True
+                    self.window['-DESCONTO-'].update(locale.currency(self.desconto))
                 try:
                     self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
                                                       self.window['-DATAPAGTO-'].get())
@@ -1720,23 +1834,23 @@ class Receber:
                 # self.window['-VALREC-'].update(str(buscar_aluno_index(self.indicealuno)[8]))
                 self.mesano = datetime.strftime(datetime.now(), '%m/%Y')
                 vlrfnstr = str(buscar_aluno_index(self.indicealuno)[8])
-                if self.diasatraso > 5:
-                    valorstr = str(buscar_aluno_index(self.indicealuno)[8])
-                    # print(resultado[idx])
-                    valorstr = valorstr.replace(',', '.')
-                    self.vlrmulta = float(valorstr) * 0.02
-                    self.vlrmultastr = str(self.vlrmulta)
-                    self.vlrmultastr = self.vlrmultastr.replace('.', ',')
-                    self.vlrmultastr = self.vlrmultastr + '0'
-                    # valorfin = float(valorstr) + vlrmulta
+                # if self.diasatraso > 5:
+                #    valorstr = str(buscar_aluno_index(self.indicealuno)[8])
+                #    print(resultado[idx])
+                #    valorstr = valorstr.replace(',', '.')
+                #    self.vlrmulta = float(valorstr) * 0.02
+                #    self.vlrmultastr = str(self.vlrmulta)
+                #    self.vlrmultastr = self.vlrmultastr.replace('.', ',')
+                #    self.vlrmultastr = self.vlrmultastr + '0'
+                #     valorfin = float(valorstr) + vlrmulta
                     # vlrfnstr = str(valorfin)
                     # vlrfnstr = vlrfnstr.replace('.', ',')
                     # vlrfnstr = vlrfnstr + '0'
                     # self.window['-VALMULTA-'].update(self.vlrmultastr)
-                    self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
+                #    self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
 
-                    if self.window['-VALMULTA-'] != '':
-                        self.window['-APLMULTA-'].update(text_color='Red')
+                #    if self.window['-VALMULTA-'] != '':
+                #        self.window['-APLMULTA-'].update(text_color='Red')
                 tmpvendas = venda_busca(self.indicealuno)
                 if not self.window['-TABELA-'].Values:
                     # vendastbl = []
@@ -1751,15 +1865,23 @@ class Receber:
                     # self.vendastbl = self.window['-TABELA-'].Values
                     self.valortotal = 0.0
                     self.valorextras = 0.0
+                    mensalidade = str(buscar_aluno_index(self.indicealuno)[8])
+                    mensalidade = mensalidade.replace(',', '.')
+                    self.vlrmensal = float(mensalidade)
                     mens = 'Mensalidade de ' + self.mesano
                     for idx, x in enumerate(self.vendastbl):
                         self.valorextras = self.valorextras + locale.atof(x[3])
                     tmpappend = [99, self.datapagto, mens,
-                                 str(buscar_aluno_index(self.indicealuno)[8])]
+                                 locale.currency(self.vlrmensal)]
                     print('Valores extras: ', self.valorextras)
                     self.vendastbl.append(tmpappend)
+                    if self.temdesconto:
+                        tmpappend = [50, self.datapagto, 'Desconto ', locale.currency(self.desconto)]
+                        self.vendastbl.append(tmpappend)
                     self.window['-TABELA-'].update(values=self.vendastbl)
                     self.valortotal = self.valorextras + locale.atof(str(buscar_aluno_index(self.indicealuno)[8]))
+                    if self.temdesconto:
+                        self.valortotal = self.valortotal - self.desconto
                     self.window['-VALREC-'].update(locale.currency(self.valortotal))
                     print('valor total: ', self.valortotal)
                 # self.window.write_event_value('-TABELA-', 'value')
@@ -1778,6 +1900,8 @@ class Receber:
                 self.vlrmensal = float(mensalidade)
                 # self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
                 self.valortotal = self.valorextras + self.vlrmensal
+                if self.temdesconto:
+                    self.valortotal = self.valortotal - self.desconto
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
                 self.vlrmsldorig = False
                 # Alteracao teste para a tabela
@@ -1788,11 +1912,22 @@ class Receber:
                 print('Valores extras: ', self.valorextras)
                 self.vendastbl = []
                 self.vendastbl.append(tmpappend)
+                tmpvendas = venda_busca(self.indicealuno)
+                for idx, x in enumerate(tmpvendas):
+                    if x[4] == 'SIM':
+                        self.vendastbl.append([x[0], x[1], x[2], x[3]])
+                self.window['-TABELA-'].update(values=self.vendastbl)
+                if self.temdesconto:
+                    tmpappend = [50, self.datapagto, 'Desconto ', locale.currency(self.desconto)]
+                    self.vendastbl.append(tmpappend)
                 self.window['-TABELA-'].update(values=self.vendastbl)
 
             if self.event == '-ATRASO0-':
                 self.ematraso = True
-                self.window['-APLMULTA-'].update(value=False)
+                # self.window['-APLMULTA-'].update(value=False)
+                self.temdesconto = False
+                self.desconto = 0
+                self.window['-DESCONTO-'].update(locale.currency(self.desconto))
                 mesano2 = str(self.window['-ATRASO0-'].get())
                 self.mesano = str(self.window['-ATRASO0-'].get())
                 atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
@@ -1800,11 +1935,27 @@ class Receber:
                 self.datavencto = str(atrasado[2]) + '/' + str(mesano2)
                 self.window['-DATAVEN-'].update(self.datavencto)
                 vendastmp = []
-                vendastmp = self.window['-TABELA-'].Values
+                self.vendastbl = []
+                tmpvendas = venda_busca(self.indicealuno)
+                mens = 'Mensalidade de ' + self.mesano
+                for idx, x in enumerate(tmpvendas):
+                    if x[4] == 'SIM':
+                        self.vendastbl.append([x[0], x[1], x[2], x[3]])
+                tmpappend = [99, self.datapagto, mens,
+                             locale.currency(self.vlrmensal)]
+                self.vendastbl.append(tmpappend)
+                vendastmp = self.vendastbl
                 self.valortotal = 0.0
                 for idx, x in enumerate(vendastmp):
-                    self.valortotal = self.valortotal + locale.atof(x[3])
+                    valortabela = x[3]
+                    valortabela = valortabela.translate({ord(c): None for c in "R$ "})
+                    valortabela = valortabela.replace(',', '.')
+                    print('valortabela', valortabela)
+                    print('atof valortabela', locale.atof(valortabela))
+                    print(float(valortabela))
+                    self.valortotal = self.valortotal + float(valortabela)
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                self.vlrmsldorig = False
                 self.vlrmensal = float(atrasado[3])
                 self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
                 datatmp = atrasado[2] + '/' + atrasado[1]
@@ -1813,36 +1964,21 @@ class Receber:
                 print('Dias atraso: ', self.diasatraso)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
-                if self.diasatraso > 5:
-                    valorstr = str(self.vlrmensal)
-                    # print(resultado[idx])
-                    # valorstr = valorstr.replace(',', '.')
-                    self.vlrmulta = float(valorstr) * 0.02
-                    self.vlrmultastr = str(self.vlrmulta)
-                    self.vlrmultastr = self.vlrmultastr.replace('.', ',')
-                    self.vlrmultastr = self.vlrmultastr + '0'
-                    # valorfin = float(valorstr) + vlrmulta
-                    # vlrfnstr = str(valorfin)
-                    # vlrfnstr = vlrfnstr.replace('.', ',')
-                    # vlrfnstr = vlrfnstr + '0'
-                    # self.window['-VALMULTA-'].update(self.vlrmultastr)
-                    self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
-                    if self.window['-VALMULTA-'] != '':
-                        self.window['-APLMULTA-'].update(text_color='Red')
-                        # self.window['-APLMULTA-'].update(value=True)
-                mens = 'Mensalidade de ' + self.mesano
-                tmpappend = []
-                tmpappend = [99, self.datapagto, mens,
-                             str(buscar_aluno_index(self.indicealuno)[8])]
-                print('Valores extras: ', self.valorextras)
-                self.vendastbl = []
-                self.vendastbl.append(tmpappend)
+                # mens = 'Mensalidade de ' + self.mesano
+                # tmpappend = []
+                # tmpappend = [99, self.datapagto, mens,
+                #             str(buscar_aluno_index(self.indicealuno)[8])]
+                # print('Valores extras: ', self.valorextras)
+                # self.vendastbl = []
+                # self.vendastbl.append(tmpappend)
                 self.window['-TABELA-'].update(values=self.vendastbl)
-
 
             if self.event == '-ATRASO1-':
                 self.ematraso = True
-                self.window['-APLMULTA-'].update(value=False)
+                # self.window['-APLMULTA-'].update(value=False)
+                self.temdesconto = False
+                self.desconto = 0
+                self.window['-DESCONTO-'].update(locale.currency(self.desconto))
                 mesano2 = str(self.window['-ATRASO1-'].get())
                 self.mesano = str(self.window['-ATRASO1-'].get())
                 atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
@@ -1850,11 +1986,27 @@ class Receber:
                 self.datavencto = str(atrasado[2]) + '/' + str(mesano2)
                 self.window['-DATAVEN-'].update(self.datavencto)
                 vendastmp = []
-                vendastmp = self.window['-TABELA-'].Values
+                self.vendastbl = []
+                tmpvendas = venda_busca(self.indicealuno)
+                mens = 'Mensalidade de ' + self.mesano
+                for idx, x in enumerate(tmpvendas):
+                    if x[4] == 'SIM':
+                        self.vendastbl.append([x[0], x[1], x[2], x[3]])
+                tmpappend = [99, self.datapagto, mens,
+                             locale.currency(self.vlrmensal)]
+                self.vendastbl.append(tmpappend)
+                vendastmp = self.vendastbl
                 self.valortotal = 0.0
                 for idx, x in enumerate(vendastmp):
-                    self.valortotal = self.valortotal + locale.atof(x[3])
+                    valortabela = x[3]
+                    valortabela = valortabela.translate({ord(c): None for c in "R$ "})
+                    valortabela = valortabela.replace(',', '.')
+                    print('valortabela', valortabela)
+                    print('atof valortabela', locale.atof(valortabela))
+                    print(float(valortabela))
+                    self.valortotal = self.valortotal + float(valortabela)
                 self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                self.vlrmsldorig = False
                 self.vlrmensal = float(atrasado[3])
                 self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
                 datatmp = atrasado[2] + '/' + atrasado[1]
@@ -1863,55 +2015,67 @@ class Receber:
                 print('Dias atraso: ', self.diasatraso)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
-                if self.diasatraso > 5:
-                    valorstr = str(self.vlrmensal)
-                    # print(resultado[idx])
-                    # valorstr = valorstr.replace(',', '.')
-                    self.vlrmulta = float(valorstr) * 0.02
-                    self.vlrmultastr = str(self.vlrmulta)
-                    self.vlrmultastr = self.vlrmultastr.replace('.', ',')
-                    self.vlrmultastr = self.vlrmultastr + '0'
-                    # valorfin = float(valorstr) + vlrmulta
-                    # vlrfnstr = str(valorfin)
-                    # vlrfnstr = vlrfnstr.replace('.', ',')
-                    # vlrfnstr = vlrfnstr + '0'
-                    # self.window['-VALMULTA-'].update(self.vlrmultastr)
-                    self.window['-VALMULTA-'].update(locale.currency(self.vlrmulta))
-                    if self.window['-VALMULTA-'] != '':
-                        self.window['-APLMULTA-'].update(text_color='Red')
-                        # self.window['-APLMULTA-'].update(value=True)
-                mens = 'Mensalidade de ' + self.mesano
-                tmpappend = []
-                tmpappend = [99, self.datapagto, mens,
-                             str(buscar_aluno_index(self.indicealuno)[8])]
-                print('Valores extras: ', self.valorextras)
-                self.vendastbl = []
-                self.vendastbl.append(tmpappend)
+                # mens = 'Mensalidade de ' + self.mesano
+                # tmpappend = []
+                # tmpappend = [99, self.datapagto, mens,
+                #             str(buscar_aluno_index(self.indicealuno)[8])]
+                # print('Valores extras: ', self.valorextras)
+                # self.vendastbl = []
+                # self.vendastbl.append(tmpappend)
                 self.window['-TABELA-'].update(values=self.vendastbl)
 
-            if self.event == '-DATAPAGTO-':
-                if self.ematraso:
-                    atrasado = mensalidades_ler_atrasado(self.indicealuno, self.mesano)
-                    self.diasatraso = diferenca_datas(self.datavencto,
-                                                      self.window['-DATAPAGTO-'].get())
-                else:
-                    self.diasatraso = diferenca_datas(geravencto(str(buscar_aluno_index(self.indicealuno)[7])),
-                                                      self.window['-DATAPAGTO-'].get())
-                self.window['-DINV-'].update(visible=False)
-                self.window['-CONF-'].update(disabled=False)
-                self.window['-DINV-'].update(visible=True)
-                self.window['-CONF-'].update(disabled=True)
+            if self.event == '-ATRASO2-':
+                self.ematraso = True
+                # self.window['-APLMULTA-'].update(value=False)
+                self.temdesconto = False
+                self.desconto = 0
+                self.window['-DESCONTO-'].update(locale.currency(self.desconto))
+                mesano2 = str(self.window['-ATRASO2-'].get())
+                self.mesano = str(self.window['-ATRASO2-'].get())
+                atrasado = mensalidades_ler_atrasado(self.indicealuno, mesano2)
+                print('Atrasado: ', atrasado)
+                self.datavencto = str(atrasado[2]) + '/' + str(mesano2)
+                self.window['-DATAVEN-'].update(self.datavencto)
+                vendastmp = []
+                self.vendastbl = []
+                tmpvendas = venda_busca(self.indicealuno)
+                mens = 'Mensalidade de ' + self.mesano
+                for idx, x in enumerate(tmpvendas):
+                    if x[4] == 'SIM':
+                        self.vendastbl.append([x[0], x[1], x[2], x[3]])
+                tmpappend = [99, self.datapagto, mens,
+                             locale.currency(self.vlrmensal)]
+                self.vendastbl.append(tmpappend)
+                vendastmp = self.vendastbl
+                self.valortotal = 0.0
+                for idx, x in enumerate(vendastmp):
+                    valortabela = x[3]
+                    valortabela = valortabela.translate({ord(c): None for c in "R$ "})
+                    valortabela = valortabela.replace(',', '.')
+                    print('valortabela', valortabela)
+                    print('atof valortabela', locale.atof(valortabela))
+                    print(float(valortabela))
+                    self.valortotal = self.valortotal + float(valortabela)
+                self.window['-VALREC-'].update(locale.currency(self.valortotal))
+                self.vlrmsldorig = False
+                self.vlrmensal = float(atrasado[3])
+                self.window['-VALMENS-'].update(locale.currency(self.vlrmensal))
+                datatmp = atrasado[2] + '/' + atrasado[1]
+                self.diasatraso = diferenca_datas(datatmp,
+                                                  self.window['-DATAPAGTO-'].get())  # EDITANDO DIAS ATRASO
+                print('Dias atraso: ', self.diasatraso)
                 self.window['-ATRASO-'].update(self.diasatraso)
                 self.datapagto = self.window['-DATAPAGTO-'].get()
-                mens = 'Mensalidade de ' + self.mesano
-                tmpappend = []
-                tmpappend = [99, self.datapagto, mens,
-                             str(buscar_aluno_index(self.indicealuno)[8])]
-                print('Valores extras: ', self.valorextras)
-                self.vendastbl = []
-                self.vendastbl.append(tmpappend)
+                # mens = 'Mensalidade de ' + self.mesano
+                # tmpappend = []
+                # tmpappend = [99, self.datapagto, mens,
+                #              str(buscar_aluno_index(self.indicealuno)[8])]
+                # print('Valores extras: ', self.valorextras)
+                # self.vendastbl = []
+                # self.vendastbl.append(tmpappend)
                 self.window['-TABELA-'].update(values=self.vendastbl)
 
+            """
             if self.event == '-APLMULTA-':
                 print(self.vlrmultastr)
                 if self.vlrmultastr != '':
@@ -1940,13 +2104,22 @@ class Receber:
                             self.valortotal = self.valortotal + locale.atof(x[3])
                         self.window['-VALREC-'].update(locale.currency(self.valortotal))
                         self.vfinalmulta = 0.0
-
+            """
             if self.event == '-CONF-':
-                valormsld = buscar_aluno_index(self.indicealuno)[8]
-                valormsld = valormsld.replace(',', '.')
+                mensalidade = str(self.window['-VALMENS-'].get())
+                mensalidade = mensalidade.translate({ord(c): None for c in "R$"})
+                mensalidade = mensalidade.replace(',', '.')
+                self.vlrmensal = float(mensalidade)
+                recebido = str(self.window['-VALREC-'].get())
+                recebido = recebido.translate({ord(c): None for c in "R$"})
+                recebido = recebido.replace(',', '.')
+                self.valortotal = float(recebido)
+
+                # A COLUNA me_vlrmulta DA TABELA MENSALIDADES AGORA E USADA PARA
+                # ARMAZENAR O VALOR DO DESCONTO AO INVES DA MULTA
                 tmp = mensalidades_insere(self.indicealuno, self.mesano,
                                           buscar_aluno_index(self.indicealuno)[7], self.vlrmensal,
-                                          self.datapagto, self.vfinalmulta,
+                                          self.datapagto, self.desconto,
                                           self.valorextras, self.valortotal, 1, self.diasatraso)
                 if tmp == 0 or tmp == 1:
                     sg.popup('Mensalidade recebida com sucesso.')
@@ -2967,7 +3140,9 @@ class Principal:
                                 sg.popup('Telefone deve ser no formato (xx)xxxxx-xxxx')
                             elif self.valuesinfo['-CPF-'].rstrip() != '' and not \
                                     re.fullmatch(regexCPF, self.valuesinfo['-CPF-'].rstrip()):
-                                sg.popup('Telefone deve ser no formato (xx)xxxxx-xxxx')
+                                sg.popup('CPF deve ser no formato 000.000.000-00')
+                            elif not valida_cpf(self.valuesinfo['-CPF-'].rstrip()):
+                                sg.popup('CPF inválido.')
                             elif self.valuesinfo['-EMAIL-'].rstrip() != '' and not \
                                     re.fullmatch(regexEmail, self.valuesinfo['-EMAIL-'].rstrip()):
                                 sg.popup('Campo email deve ser no formato abc@de.fgh')
@@ -3296,6 +3471,8 @@ class Principal:
                         elif self.values2['-CPF-'].rstrip() != '' and not \
                                 re.fullmatch(regexCPF, self.values2['-CPF-'].rstrip()):
                             sg.popup('CPF deve ser no formato 000.000.000-00')
+                        elif not valida_cpf(self.values2['-CPF-'].rstrip()):
+                            sg.popup('CPF inválido.')
                         elif self.values2['-EMAIL-'].rstrip() != '' and not \
                                 re.fullmatch(regexEmail, self.values2['-EMAIL-'].rstrip()):
                             sg.popup('Campo email deve ser no formato abc@de.fgh')
