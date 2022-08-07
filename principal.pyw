@@ -12,7 +12,9 @@ import locale
 import operator
 import calendar
 import logging
-import pygogo as py
+import datetime as dtt
+from time import strptime
+# import pygogo as py
 # import random
 
 # from PySimpleGUI import TABLE_SELECT_MODE_BROWSE
@@ -42,14 +44,14 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
-# CONSERTAR O RELATÓRIO DE NÃO PAGADORES MENSAL - INCLUI A FUNÇÃO PRA IMPRIMIR DEVEDORES - JANELA NAO FUNCIONA
-# FUNCAO PRA IMPRIMIR LISTA DE ALUNOS DEVEDORES
+# FUNCAO PRA IMPRIMIR LISTA DE ALUNOS DEVEDORES NO RELATORIO DE NÃO PAGADORES
 # MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
 # - intervalos - marcar quantos dias até a pessoa retornar do intervalo
 # - VALIDACAO de dados em todos os campos de entrada
 # - implementar log de erros de acordo com
 # https://stackoverflow.com/questions/3383865/how-to-log-error-to-file-and-not-fail-on-exception
 # mudar a cor da linha na tabela quando um aluno estiver em pausa
+# OK CONSERTAR O RELATÓRIO DE NÃO PAGADORES MENSAL - INCLUI A FUNÇÃO PRA IMPRIMIR DEVEDORES - JANELA NAO FUNCIONA
 # OK COMPRA NAO APARECE NA MENSALIDADE ATRASADA, MAS E CONTADO O VALOR
 # OK IMPRESSAO RECIBO NA JANELA VENDER
 # OK TERMINAR A CLASSE Aderir_planos
@@ -1108,16 +1110,31 @@ def rel_fin_mensal(mesano):
 
 # Função gera relatório de não pagadores - para substituir a rel_nao_pagadores
 def mensalidades_relatorio_devidas(mesano):
+    # Retorna nome do aluno, valor da parcela atrasada, dia do vencimento
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
-    c.execute('SELECT al_index, al_nome FROM Alunos')
+    c.execute('SELECT al_index, al_nome FROM Alunos WHERE al_ativo = "S"')
     alunos = c.fetchall()
+    dados = (mesano, 0)
+    resultado = []
+    lista = []
+    conexao.close()
+    conexao = sqlite3.connect(mdbfile)
+    c = conexao.cursor()
     for idx, x in enumerate(alunos):
-        # temp = []
         nometabela = 'mens_' + str(x[0])
-        comando = 'SELECT me_datapgto, me_atraso, me_vlrpago, me_pg FROM ' + nometabela + ' WHERE me_mesano LIKE ?'
-        c.execute(comando, (mesano,))
-        temp = c.fetchone()
+        comando = 'SELECT me_valor, ' \
+                  'me_diaven FROM ' + nometabela + ' WHERE me_mesano LIKE ? AND me_pg = ?'
+        c.execute(comando, dados)
+        lista = c.fetchone()
+        print(lista)
+        if lista:
+            temp = list(lista)
+            temp.insert(0, x[1])
+            resultado.append(temp)
+    print(resultado)
+    conexao.close()
+    return resultado
 
 
 # FUNCAO GERA RELATORIO NAO PAGADORES
@@ -1275,6 +1292,30 @@ def sort_table(table, cols):
             sg.popup_error('Error in sort_table', 'Exception in sort_table', e)
     return table
 
+
+def mes_extenso(mes_int, opcao):
+    # converte o número de um mês (int) para o nome
+    # opcao: 0 ret. mes extenso, 1 retorna mes abreviado
+    resultado = ''
+    if opcao == 0:
+        resultado = dtt.date(1900, mes_int, 1).strftime('%B')
+    elif opcao == 1:
+        resultado = dtt.date(1900, mes_int, 1).strftime('%b')
+    resultado = resultado.capitalize()
+    return resultado
+
+
+def mes_numero(mes_str):
+    # converte o nome de um mês em número
+    if len(mes_str) > 3:
+        int_tmp = strptime(mes_str, '%B').tm_mon
+    else:
+        int_tmp = strptime(mes_str, '%b').tm_mon
+    if int_tmp in (1, 2, 3, 4, 5, 6, 7, 8, 9):
+        resultado = '0' + str(int_tmp)
+    else:
+        resultado = str(int_tmp)
+    return resultado
 
 # def validar_data(date_text):
 #    try:
@@ -4042,7 +4083,7 @@ class RelNaoPago:
     meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro',
              'Outubro', 'Novembro', 'Dezembro']
     rot_tabela = ['Aluno', 'Mês em haver', 'Valor', 'Atraso']  # atraso é o tempo que está atrasada a mens.
-    larg_col = [25, 15, 15, 12]
+    larg_col = [25, 0, 15, 12]
 
     def __init__(self):
         self.values = None
@@ -4050,26 +4091,28 @@ class RelNaoPago:
         self.layout = [
             [sg.Text('Relatório de não pagadores', font='_ 25', key='-TITULO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
-            [sg.Text('Mês desejado:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True),
+            [sg.Text('Mês desejado:'), sg.Combo(meses, key='-MES-',
+                                                default_value=datetime.now().strftime('%B').capitalize(),
+                                                enable_events=True),
              sg.T('Ano:'),
-             sg.I(default_text='2022', s=(10, 1), k='-ANO-')],
-            [sg.Radio('Somente mês selecionado', "RadioDemo", default=True, k='-R1-'),
-             sg.Radio('Mês selecionado e anteriores', "RadioDemo", k='-R2-')],
+             sg.I(default_text=datetime.now().strftime('%Y'), s=(10, 1), k='-ANO-')],
             [sg.Table(values=[], headings=self.rot_tabela, col_widths=self.larg_col,
                       # max_col_width=15,
+                      visible_column_map=[True, False, True, True],
                       auto_size_columns=False,
                       num_rows=15,
                       def_col_width=10,
-                      alternating_row_color='lightblue4',
+                      # alternating_row_color='lightblue4',
                       key='-TABLE-',
-                      selected_row_colors='black on lightblue1',
+                      # selected_row_colors='black on lightblue1',
                       enable_events=True,
                       expand_x=True,
                       expand_y=True,
                       enable_click_events=True
                       )],
             [sg.Push(), sg.T('Valor total devido:'), sg.I(k='-TOTAL-', disabled=True, s=(10, 1))],
-            [sg.Button('Gerar relatório', key='-GERA-', bind_return_key=True), sg.Button('Fechar', key='-FECHAR-')]
+            [sg.Push(), sg.Button('Gerar relatório', key='-GERA-', bind_return_key=True),
+             sg.Button('Fechar', key='-FECHAR-')]
 
         ]
 
@@ -4079,69 +4122,22 @@ class RelNaoPago:
     def run(self):
         while True:
             self.event, self.values = self.window.read()
-            mes = ''
-            if self.values['-MES-'].rstrip() == 'Janeiro':
-                mes = '01'
-            elif self.values['-MES-'].rstrip() == 'Fevereiro':
-                mes = '02'
-            elif self.values['-MES-'].rstrip() == 'Março':
-                mes = '03'
-            elif self.values['-MES-'].rstrip() == 'Abril':
-                mes = '04'
-            elif self.values['-MES-'].rstrip() == 'Maio':
-                mes = '05'
-            elif self.values['-MES-'].rstrip() == 'Junho':
-                mes = '06'
-            elif self.values['-MES-'].rstrip() == 'Julho':
-                mes = '07'
-            elif self.values['-MES-'].rstrip() == 'Agosto':
-                mes = '08'
-            elif self.values['-MES-'].rstrip() == 'Setembro':
-                mes = '09'
-            elif self.values['-MES-'].rstrip() == 'Outubro':
-                mes = '10'
-            elif self.values['-MES-'].rstrip() == 'Novembro':
-                mes = '11'
-            elif self.values['-MES-'].rstrip() == 'Dezembro':
-                mes = '12'
 
-            if (self.event == '-GERA-' or self.event == '-MES-') and self.values['-R1-'] is True:
-                # print('entrou no if')
-                mesano = mes + '/' + str(self.values['-ANO-'].rstrip())
-                self.window['-TABLE-'].update(rel_nao_pagadores(mesano, 'atual'))
-                calc_val_dev = rel_nao_pagadores(mesano, 'atual')
-                val_dev = 0.00
-                i = 0
-                while i < len(calc_val_dev):
-                    valor = calc_val_dev[i][2]
-                    # print(calc_val_dev[i][2])
-                    # print(calc_val_dev[i])
-                    valor = valor.replace(',', '.')
-                    val_dev = val_dev + float(valor)
-                    # print(val_rec)
-                    i = i + 1
-                valfinal = str(val_dev).replace('.', ',')
-                valfinal = valfinal + '0'
-                self.window['-TOTAL-'].update(valfinal)
-
-            if (self.event == '-GERA-' or self.event == '-MES-') and self.values['-R2-'] is True:
-                # print('entrou no if')
-                mesano = mes + '/' + str(self.values['-ANO-'].rstrip())
-                self.window['-TABLE-'].update(rel_nao_pagadores(mesano, 'anteriores'))
-                calc_val_dev = rel_nao_pagadores(mesano, 'anteriores')
-                val_dev = 0.00
-                i = 0
-                while i < len(calc_val_dev):
-                    valor = calc_val_dev[i][2]
-                    # print(calc_val_dev[i][2])
-                    # print(calc_val_dev[i])
-                    valor = valor.replace(',', '.')
-                    val_dev = val_dev + float(valor)
-                    # print(val_rec)
-                    i = i + 1
-                valfinal = str(val_dev).replace('.', ',')
-                valfinal = valfinal + '0'
-                self.window['-TOTAL-'].update(valfinal)
+            if self.event == '-GERA-':
+                mesano = str(mes_numero(str(self.values['-MES-'].rstrip())) + '/' + str(self.values['-ANO-'].rstrip()))
+                mensalidades_devidas = mensalidades_relatorio_devidas(mesano)
+                tabela_tmp = []
+                valortotal = 0.0
+                for idx, x in enumerate(mensalidades_devidas):
+                    data_vencto = str(x[2]) + '/' + mesano
+                    atraso_timedelta = (datetime.now() - datetime.strptime(data_vencto, '%d/%m/%Y'))
+                    atraso = str(atraso_timedelta.days)
+                    if int(atraso) < 0:
+                        atraso = '0'
+                    tabela_tmp.append([x[0], self.values['-MES-'].rstrip(), locale.currency(float(x[1])), atraso])
+                    valortotal += float(x[1])
+                self.window['-TABLE-'].Update(values=tabela_tmp)
+                self.window['-TOTAL-'].Update(value=locale.currency(valortotal))
 
             if self.event == sg.WIN_CLOSED or self.event == '-FECHAR-':
                 break
