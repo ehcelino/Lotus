@@ -44,13 +44,13 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
-# FUNCAO PRA IMPRIMIR LISTA DE ALUNOS DEVEDORES NO RELATORIO DE NÃO PAGADORES
 # MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
 # - intervalos - marcar quantos dias até a pessoa retornar do intervalo
 # - VALIDACAO de dados em todos os campos de entrada
 # - implementar log de erros de acordo com
 # https://stackoverflow.com/questions/3383865/how-to-log-error-to-file-and-not-fail-on-exception
 # mudar a cor da linha na tabela quando um aluno estiver em pausa
+# OK FUNCAO PRA IMPRIMIR LISTA DE ALUNOS DEVEDORES NO RELATORIO DE NÃO PAGADORES
 # OK CONSERTAR O RELATÓRIO DE NÃO PAGADORES MENSAL - INCLUI A FUNÇÃO PRA IMPRIMIR DEVEDORES - JANELA NAO FUNCIONA
 # OK COMPRA NAO APARECE NA MENSALIDADE ATRASADA, MAS E CONTADO O VALOR
 # OK IMPRESSAO RECIBO NA JANELA VENDER
@@ -455,9 +455,10 @@ def mensalidades_criar():
             # nometabela = 'mens_1'
             # dados = [x[1], x[2], mesano]
             # dados = [mesano]
-            comando = 'INSERT INTO ' + nometabela + ' (me_mesano,me_diaven,me_valor,me_pg) SELECT "' + mesano + '", "' + x[
-                1] + '", "' + valorstr + '", "0" WHERE NOT EXISTS ' \
-                                         '(SELECT 2 FROM ' + nometabela + ' WHERE me_mesano = "' + mesano + '")'
+            comando = 'INSERT INTO ' + nometabela + \
+                      ' (me_mesano,me_diaven,me_valor,me_pg) SELECT "' + mesano + \
+                      '", "' + x[1] + '", "' + valorstr + '", "0" WHERE NOT EXISTS ' \
+                                                          '(SELECT 2 FROM ' + nometabela + ' WHERE me_mesano = "' + mesano + '")'
             # comando = 'UPDATE ' + nometabela + ' SET me_diaven= ?,me_valor = ? WHERE me_mesano = ?'
             # comando = 'DELETE FROM ' + nometabela + ' WHERE me_mesano = ?'
             # print(comando)
@@ -613,6 +614,15 @@ def opcao_ler():
     return resultado
 
 
+# FUNCAO LE A TABELA OPCAO
+def opcao_apagar(indice):
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('DELETE FROM Opcao WHERE op_index = ?', (indice,))
+    conexao.commit()
+    conexao.close()
+
+
 # FUNCAO LE APENAS A DESCRICAO NA TABELA OPCAO
 def opcao_ler_desc():
     conexao = sqlite3.connect(dbfile)
@@ -637,14 +647,23 @@ def opcao_buscar_desc(desc):
     return resultado
 
 
-# FUNCAO GRAVA A OPCAO DE TREINO
-def opcao_escreve(index, indexopcao, descricao, diasopcao):
+# Função que grava as alterações na opção ou uma nova opção
+# Update/Insere descrição, dias e valor
+def opcao_escreve(index, descricao, dias2, valor):
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
-    c.execute('SELECT * FROM Opcao WHERE op_desc = ?', ('desc',))
-    resultado = c.fetchall()
+    c.execute('SELECT * FROM Opcao WHERE op_index = ?', (index,))
+    resultado = c.fetchone()
+    dados = [descricao, dias2, valor, index]
+    if resultado:
+        comando = 'UPDATE Opcao SET op_desc = ?, op_diassemana = ?, op_valor = ? WHERE op_index = ?'
+        c.execute(comando, dados)
+    else:
+        dados = [descricao, dias2, valor]
+        comando = 'INSERT INTO Opcao(op_desc, op_diassemana, op_valor) VALUES (?, ?, ?)'
+        c.execute(comando, dados)
+    conexao.commit()
     conexao.close()
-    return resultado
 
 
 # FUNCAO LE A TABELA PLANOS
@@ -705,6 +724,31 @@ def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
                                                 '?,?,?) '
         c.execute(comando, dados)
         conexao.commit()
+    conexao.close()
+
+
+def planos_grava(index, descricao, meses2, valor):
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('SELECT * FROM Planos WHERE pl_index = ?', (index,))
+    resultado = c.fetchone()
+    dados = [descricao, meses2, valor, index]
+    if resultado:
+        comando = 'UPDATE Planos SET pl_desc = ?, pl_periodo = ?, pl_valor = ? WHERE pl_index = ?'
+        c.execute(comando, dados)
+    else:
+        dados = [descricao, meses2, valor]
+        comando = 'INSERT INTO Planos(pl_desc, pl_periodo, pl_valor) VALUES (?, ?, ?)'
+        c.execute(comando, dados)
+    conexao.commit()
+    conexao.close()
+
+
+def planos_apagar(indice):
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('DELETE FROM Planos WHERE pl_index = ?', (indice,))
+    conexao.commit()
     conexao.close()
 
 
@@ -835,6 +879,7 @@ def mesatual():
 
 # INICIO FUNCAO APAGA REGISTROS
 def apaga_registro(index):
+    # todo alterar esta funcao
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
     c.execute('DELETE FROM Financeiro WHERE fi_nome = ?', (index,))
@@ -1130,7 +1175,8 @@ def mensalidades_relatorio_devidas(mesano):
         print(lista)
         if lista:
             temp = list(lista)
-            temp.insert(0, x[1])
+            temp.insert(0, x[0])
+            temp.insert(1, x[1])
             resultado.append(temp)
     print(resultado)
     conexao.close()
@@ -1317,6 +1363,7 @@ def mes_numero(mes_str):
         resultado = str(int_tmp)
     return resultado
 
+
 # def validar_data(date_text):
 #    try:
 #        if date_text != datetime.strptime(date_text, "%Y-%m-%d").strftime('%Y-%m-%d'):
@@ -1324,6 +1371,175 @@ def mes_numero(mes_str):
 #        return True
 #    except ValueError:
 #        return False
+
+# janela configurar opções de treino
+class Opcoes_treino:
+    row = []
+    dados = []
+
+    def __init__(self):
+        self.primeiro = True
+        self.desfazapaga = False
+        self.editando = False
+        self.linha = None
+        self.values = None
+        self.event = None
+        self.tabela_header = ['Índice', 'Descrição', 'Dias', 'Valor']
+        self.tabela_larg = [5, 25, 5, 10]
+        self.col_direita = sg.Column([[
+            sg.Frame('Opções', [
+                [sg.B('Editar', k='-EDITAR-', s=(8, 1))],
+                [sg.B('Desfazer', k='-DESFAZER-', s=(8, 1), disabled=True)],
+                [sg.B('Limpar', k='-LIMPAR-', s=(8, 1))],
+                [sg.B('Gravar', k='-SALVAR-', s=(8, 1))],
+                [sg.B('Excluir', k='-APAGAR-', s=(8, 1))],
+            ])
+        ]])
+        self.col_esquerda = sg.Column([[
+            sg.Frame('Treinos disponíveis (clique para editar)', [
+                [sg.Table(values=opcao_ler(),
+                          visible_column_map=[True, True, True, True],
+                          headings=self.tabela_header, max_col_width=20,
+                          auto_size_columns=False,
+                          col_widths=self.tabela_larg,
+                          justification='left',
+                          num_rows=8,
+                          key='-TABELA-',
+                          enable_events=True,
+                          expand_x=True,
+                          expand_y=True,
+                          bind_return_key=True,
+                          select_mode=sg.TABLE_SELECT_MODE_BROWSE,
+                          tooltip='Selecione um campo e clique em editar, alterar ou excluir.'
+                          )],
+            ])
+        ]])
+        self.col_abaixo = sg.Column([[
+            sg.Frame('Editar', [
+                [sg.T('Descrição:', s=(8, 1)), sg.I(k='-DESCRICAO-', s=(40, 1)),
+                 sg.T('Dias por semana:'), sg.I(k='-DIASSEMANA-', s=(5, 1))],
+                [sg.T('Valor R$:', s=(8, 1)), sg.I(k='-VALOR-', s=(10, 1))],
+            ])
+        ]])
+
+        self.layout = [
+            [sg.Text('Opções de treino', font='_ 25', key='-TITULO-')],
+            [sg.HorizontalSeparator(k='-SEP-')],
+            [self.col_esquerda,
+             self.col_direita],
+            [self.col_abaixo],
+            [sg.Push(), sg.Button('Fechar', k='-FECHAR-')],
+            [sg.Text(key='-EXPAND-', font='ANY 1', pad=(0, 0))],
+            [sg.StatusBar('Selecione um item da lista para editar/excluir, ou crie um novo.')]
+        ]
+
+        self.window = sg.Window('Opções de treino', self.layout,
+                                finalize=True, )
+
+        self.window['-EXPAND-'].expand(True, True, True)
+
+    def run(self):
+        # converter o valor em moeda antes de popular a tabela.
+        tabela_tmp2 = []
+        tabela_tmp = opcao_ler()
+        for idx, x in enumerate(tabela_tmp):
+            tabela_tmp2.append([x[0], x[1], x[2], locale.currency(float(x[3]))])
+        if self.primeiro:
+            self.window['-TABELA-'].update(values=tabela_tmp2)
+            self.primeiro = False
+        while True:
+            self.event, self.values = self.window.read()
+            # print('event: ', self.event)
+            # print('values: ', self.values)
+
+            if self.event == '-TABELA-':
+                self.row = self.values[self.event]
+                self.dados = self.window['-TABELA-'].Values
+                # print('row: ', self.row)
+
+            if self.event == '-ATUALIZA-':
+                tabela_tmp2 = []
+                tabela_tmp = opcao_ler()
+                for idx, x in enumerate(tabela_tmp):
+                    tabela_tmp2.append([x[0], x[1], x[2], locale.currency(float(x[3]))])
+                self.window['-TABELA-'].update(values=tabela_tmp2)
+
+            if self.event == '-EDITAR-':
+                if len(self.row) != 0:
+                    self.editando = True
+                    self.linha = self.dados[self.row[0]]
+                    self.window['-DESCRICAO-'].update(self.linha[1])
+                    self.window['-DIASSEMANA-'].update(self.linha[2])
+                    self.window['-VALOR-'].update(self.linha[3])
+                    self.window['-DESFAZER-'].update(disabled=False)
+                else:
+                    sg.popup('Selecione um registro na tabela.')
+
+            if self.event == '-DESFAZER-':
+                self.window['-DESCRICAO-'].update(self.linha[1])
+                self.window['-DIASSEMANA-'].update(self.linha[2])
+                self.window['-VALOR-'].update(self.linha[3])
+                self.window['-DESFAZER-'].update(disabled=True)
+                # self.editando = False
+
+            if self.event == '-LIMPAR-':
+                self.window['-DESCRICAO-'].update('')
+                self.window['-DIASSEMANA-'].update('')
+                self.window['-VALOR-'].update('')
+                self.editando = False
+
+            if self.event == '-SALVAR-':
+                valor = self.window['-VALOR-'].get()
+                if valor != '':
+                    valor = valor.translate({ord(c): None for c in "R$ "})
+                else:
+                    sg.popup('Campo valor não pode ser vazio.')
+                if self.window['-DESCRICAO-'].get() == '':
+                    sg.popup('Campo descrição vazio.')
+                elif self.window['-DIASSEMANA-'].get() == '':
+                    sg.popup('Campo dias por semana vazio.')
+                elif self.window['-VALOR-'].get() == '':
+                    sg.popup('Campo valor vazio.')
+                elif self.values['-VALOR-'].rstrip() != '' and not \
+                        re.fullmatch(regexDinheiro, valor):
+                    sg.popup('Valor deve ser no formato xxx,xx.')
+                else:
+                    valor = valor.replace(',', '.')
+                    if self.editando:
+                        indice = self.linha[0]
+                        opcao_escreve(indice, self.window['-DESCRICAO-'].get(),
+                                      self.window['-DIASSEMANA-'].get(), valor)
+                    else:
+                        opcao_escreve(99, self.window['-DESCRICAO-'].get(),
+                                      self.window['-DIASSEMANA-'].get(), valor)
+                    self.window['-DESCRICAO-'].update('')
+                    self.window['-DIASSEMANA-'].update('')
+                    self.window['-VALOR-'].update('')
+                    self.window['-DESFAZER-'].update(disabled=True)
+                    self.editando = False
+                    self.window.write_event_value('-ATUALIZA-', '')
+                    # self.window['-TABELA-'].update(values=opcao_ler())
+                    self.primeiro = True
+
+            if self.event == '-APAGAR-':
+                if len(self.row) != 0:
+                    opcao, _ = sg.Window('Continuar?', [[sg.T('Tem certeza?')],
+                                                        [sg.Yes(s=10, button_text='Sim'),
+                                                         sg.No(s=10, button_text='Não')]], disable_close=True,
+                                         modal=True).read(close=True)
+                    if opcao == 'Sim':
+                        self.linha = self.dados[self.row[0]]
+                        print(self.linha[0])
+                        opcao_apagar(self.linha[0])
+                        self.primeiro = True
+                        self.window.write_event_value('-ATUALIZA-', '')
+                else:
+                    sg.popup('Selecione um registro na tabela.')
+
+            if self.event in (sg.WIN_CLOSED, '-FECHAR-'):
+                break
+
+        self.window.close()
 
 
 # JANELA CONFIGURACOES
@@ -1571,7 +1787,7 @@ class Aderir_planos:
 
             if self.event == '-TABELAPL-':
                 self.row = self.values[self.event]
-                print(self.row)
+                # print(self.row)
                 self.dados = self.window['-TABELAPL-'].Values
 
             if self.event == '-SIM-':
@@ -1583,7 +1799,7 @@ class Aderir_planos:
                     self.planomeses = tmpmonths
                     self.planodescricao = self.dados[self.row[0]][1]
                     if buscar_aluno_index(self.indicealuno)[13] in (
-                    0, None, ''):  # retorna se o aluno tem plano família
+                            0, None, ''):  # retorna se o aluno tem plano família
                         valorstr = buscar_aluno_index(self.indicealuno)[8]  # retorna valor da mensalidade
                         valorstr = valorstr.replace(',', '.')
                         self.valordesc = float(valorstr) * float(self.dados[self.row[0]][3])
@@ -1716,47 +1932,136 @@ class Aderir_planos:
 
 
 # JANELA ALTERA PLANOS
-class Planos:
+class Editar_planos:
+    row = []
+    dados = []
+    linha = []
+    editando = False
 
     def __init__(self):
         self.values = None
         self.event = None
-        self.layframe = [
-            [sg.T('Descrição:'), sg.I(s=(50, 1), k='-DESC-')],
-            [sg.T('Período (meses):'), sg.I(s=(4, 1), k='-PER-'),
-             sg.T('Valor (porc.):'), sg.I(s=(4, 1), k='-VAL-')],
-        ]
+        self.col_direita = sg.Column([[
+            sg.Frame('Opções', [
+                [sg.B('Editar', k='-EDITAR-', s=(8, 1))],
+                [sg.B('Desfazer', k='-DESFAZER-', s=(8, 1), disabled=True)],
+                [sg.B('Limpar', k='-LIMPAR-', s=(8, 1))],
+                [sg.B('Gravar', k='-SALVAR-', s=(8, 1))],
+                [sg.B('Excluir', k='-APAGAR-', s=(8, 1))],
+            ])
+        ]])
+        self.col_esquerda = sg.Column([[
+            sg.Frame('', [
+                [sg.T('Planos são divididos em descrição, período e valor.')],
+                [sg.T('Período é a duração do plano em meses.')],
+                [sg.T('Valor é a porcentagem de desconto oferecida.')],
+                [sg.T('Planos existentes:')],
+                [sg.Table(planos_ler(),
+                          headings=['I', 'Descrição', 'Período', 'Valor'],
+                          visible_column_map=[False, True, True, True],
+                          col_widths=[0, 50, 5, 5],
+                          num_rows=4,
+                          enable_events=True,
+                          k='-TPLANOS-',
+                          expand_y=True,
+                          expand_x=True,
+                          right_click_selects=True,
+                          right_click_menu=['&Right', ['Editar']]
+                          )],
+            ])
+        ]])
+        self.col_inferior = sg.Column([[
+            sg.Frame('', [
+                [sg.T('Descrição:'), sg.I(s=(50, 1), k='-DESCRICAO-')],
+                [sg.T('Período (meses):'), sg.I(s=(4, 1), k='-PERIODO-'),
+                 sg.T('Valor (porc.):'), sg.I(s=(4, 1), k='-VALOR-')],
+            ])
+        ]])
         self.layout = [
-            [sg.Text('Planos', font='_ 25', key='-TITULO-')],
+            [sg.Text('Opções de planos', font='_ 25', key='-TITULO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
-            [sg.T('Planos são divididos em descrição, período e valor.')],
-            [sg.T('Período é a duração do plano em meses.')],
-            [sg.T('Valor é a porcentagem de desconto oferecida.')],
-            [sg.T('Planos existentes:')],
-            [sg.Table(planos_ler(),
-                      headings=['I', 'Descrição', 'Período', 'Valor'],
-                      visible_column_map=[False, True, True, True],
-                      col_widths=[0, 50, 5, 5],
-                      num_rows=4,
-                      enable_events=True,
-                      k='-TPLANOS-',
-                      expand_y=True,
-                      expand_x=True,
-                      right_click_selects=True,
-                      right_click_menu=['&Right', ['Editar']]
-                      )],
-            [sg.Frame('', self.layframe)],
-            [sg.Push(), sg.Button('Fechar', k='-FECHAR-')]
+            [self.col_esquerda,
+             self.col_direita],
+            [self.col_inferior],
+            [sg.Push(), sg.Button('Fechar', k='-FECHAR-')],
+            [sg.Text(key='-EXPAND-', font='ANY 1', pad=(0, 0))],
+            [sg.StatusBar('Selecione um item da lista para editar/excluir, ou crie um novo.')]
         ]
 
         self.window = sg.Window('Planos', self.layout,
-                                finalize=True, modal=True
+                                finalize=True
                                 )
+        self.window['-EXPAND-'].expand(True, True, True)
 
     def run(self):
         while True:
-
             self.event, self.values = self.window.read()
+
+            if self.event == '-TPLANOS-':
+                self.row = self.values[self.event]
+                self.dados = self.window['-TPLANOS-'].Values
+
+            if self.event == '-ATUALIZA-':
+                self.window['-TPLANOS-'].update(values=planos_ler())
+
+            if self.event == '-EDITAR-':
+                if len(self.row) != 0:
+                    self.editando = True
+                    self.linha = self.dados[self.row[0]]
+                    self.window['-DESCRICAO-'].update(self.linha[1])
+                    self.window['-PERIODO-'].update(self.linha[2])
+                    self.window['-VALOR-'].update(self.linha[3])
+                    self.window['-DESFAZER-'].update(disabled=False)
+                else:
+                    sg.popup('Selecione um registro na tabela.')
+
+                if self.event == '-DESFAZER-':
+                    self.window['-DESCRICAO-'].update(self.linha[1])
+                    self.window['-PERIODO-'].update(self.linha[2])
+                    self.window['-VALOR-'].update(self.linha[3])
+                    self.window['-DESFAZER-'].update(disabled=True)
+
+                if self.event == '-LIMPAR-':
+                    self.window['-DESCRICAO-'].update('')
+                    self.window['-PERIODO-'].update('')
+                    self.window['-VALOR-'].update('')
+                    self.editando = False
+
+                if self.event == '-SALVAR-':
+                    if self.window['-DESCRICAO-'].get() == '':
+                        sg.popup('Campo descrição vazio.')
+                    elif self.window['-PERIODO-'].get() == '':
+                        sg.popup('Campo dias por semana vazio.')
+                    elif self.window['-VALOR-'].get() == '':
+                        sg.popup('Campo valor vazio.')
+                    else:
+                        if self.editando:
+                            indice = self.linha[0]
+                            opcao_escreve(indice, self.window['-DESCRICAO-'].get(),
+                                          self.window['-PERIODO-'].get(), self.window['-VALOR-'].get())
+                        else:
+                            opcao_escreve(99, self.window['-DESCRICAO-'].get(),
+                                          self.window['-PERIODO-'].get(), self.window['-VALOR-'].get())
+                        self.window['-DESCRICAO-'].update('')
+                        self.window['-PERIODO-'].update('')
+                        self.window['-VALOR-'].update('')
+                        self.window['-DESFAZER-'].update(disabled=True)
+                        self.editando = False
+                        self.window.write_event_value('-ATUALIZA-', '')
+
+                if self.event == '-APAGAR-':
+                    if len(self.row) != 0:
+                        opcao, _ = sg.Window('Continuar?', [[sg.T('Tem certeza?')],
+                                                            [sg.Yes(s=10, button_text='Sim'),
+                                                             sg.No(s=10, button_text='Não')]], disable_close=True,
+                                             modal=True).read(close=True)
+                        if opcao == 'Sim':
+                            self.linha = self.dados[self.row[0]]
+                            planos_apagar(self.linha[0])
+                            self.window.write_event_value('-ATUALIZA-', '')
+                    else:
+                        sg.popup('Selecione um registro na tabela.')
+
             if self.event == sg.WIN_CLOSED or self.event == '-FECHAR-':
                 break
         self.window.close()
@@ -2360,7 +2665,7 @@ class Principal:
         ['&Arquivo', ['Adicionar aluno', 'Receber mensalidade',
                       'Informações do aluno', 'Financeiro', 'Lembretes', '---', '&Sair']],
         # 'Save::savekey',
-        ['&Editar', ['Configurações', 'Mudar tema', '---', 'Planos'], ],
+        ['&Editar', ['Configurações', 'Mudar tema', '---', 'Editar opções de treino', 'Editar planos'], ],
         ['&Relatórios', ['Recebimento', 'Devedores', 'Gráfico', 'Lista de alunos(imprime)']],
         ['&Ferramentas', ['Backup parcial', 'Backup completo', 'Administração', ['Limpar banco de dados']]],
         ['A&juda', ['Tela principal', 'Sobre...']], ]
@@ -2552,6 +2857,10 @@ class Principal:
                     sg.user_settings_set_entry('-location-', self.window.current_location())
                     break
 
+            if self.event == 'Editar opções de treino':
+                objeditaropcoes = Opcoes_treino()
+                objeditaropcoes.run()
+
             if self.event == 'Lista de alunos(imprime)':
                 pdfgen.gera_lista_pdf(alunos_nomeven())
                 self.window.perform_long_operation(
@@ -2575,9 +2884,9 @@ class Principal:
                 objgrafico = grafico_mensal()
                 objgrafico.run()
 
-            if self.event == 'Planos':
-                objplanos = Planos()
-                objplanos.run()
+            if self.event == 'Editar planos':
+                objedplanos = Editar_planos()
+                objedplanos.run()
 
             if self.event == 'Lembretes':
                 objlembrete = Lembretes()
@@ -4084,6 +4393,7 @@ class RelNaoPago:
              'Outubro', 'Novembro', 'Dezembro']
     rot_tabela = ['Aluno', 'Mês em haver', 'Valor', 'Atraso']  # atraso é o tempo que está atrasada a mens.
     larg_col = [25, 0, 15, 12]
+    tabela_relatorio = None
 
     def __init__(self):
         self.values = None
@@ -4112,6 +4422,7 @@ class RelNaoPago:
                       )],
             [sg.Push(), sg.T('Valor total devido:'), sg.I(k='-TOTAL-', disabled=True, s=(10, 1))],
             [sg.Push(), sg.Button('Gerar relatório', key='-GERA-', bind_return_key=True),
+             sg.B('Imprimir relatório', k='-IMPRIME-', disabled=True),
              sg.Button('Fechar', key='-FECHAR-')]
 
         ]
@@ -4127,17 +4438,28 @@ class RelNaoPago:
                 mesano = str(mes_numero(str(self.values['-MES-'].rstrip())) + '/' + str(self.values['-ANO-'].rstrip()))
                 mensalidades_devidas = mensalidades_relatorio_devidas(mesano)
                 tabela_tmp = []
+                self.tabela_relatorio = []
                 valortotal = 0.0
                 for idx, x in enumerate(mensalidades_devidas):
-                    data_vencto = str(x[2]) + '/' + mesano
+                    data_vencto = str(x[3]) + '/' + mesano
                     atraso_timedelta = (datetime.now() - datetime.strptime(data_vencto, '%d/%m/%Y'))
                     atraso = str(atraso_timedelta.days)
                     if int(atraso) < 0:
                         atraso = '0'
-                    tabela_tmp.append([x[0], self.values['-MES-'].rstrip(), locale.currency(float(x[1])), atraso])
-                    valortotal += float(x[1])
+                    tabela_tmp.append([x[1], self.values['-MES-'].rstrip(), locale.currency(float(x[2])), atraso])
+                    self.tabela_relatorio.append([x[0], x[1], atraso])
+                    valortotal += float(x[2])
                 self.window['-TABLE-'].Update(values=tabela_tmp)
                 self.window['-TOTAL-'].Update(value=locale.currency(valortotal))
+                self.window['-IMPRIME-'].update(disabled=False)
+
+            if self.event == '-IMPRIME-':
+                if self.tabela_relatorio:
+                    mes_ano = self.values['-MES-'].rstrip() + ' de ' + str(self.values['-ANO-'].rstrip())
+                    pdfgen.gera_lista_dividas(self.tabela_relatorio, mes_ano)
+                    self.window.perform_long_operation(
+                        lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_lista),
+                        '-FUNCTION COMPLETED-')
 
             if self.event == sg.WIN_CLOSED or self.event == '-FECHAR-':
                 break

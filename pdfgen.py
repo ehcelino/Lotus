@@ -170,9 +170,46 @@ def gera_lista_pdf(lista):
     # rpdf.output(arq_recibo, 'F')
     rpdf.output(arq_lista)
 
+
+class PDF(FPDF):
+    # def header(self):
+    # Logo
+    #     self.image('logo_pb.png', 10, 8, 33)
+    # Arial bold 15
+    #     self.set_font('Arial', 'B', 15)
+    # Move to the right
+    #     self.cell(80)
+    # Title
+    #     self.cell(30, 10, 'Title', 1, 0, 'C')
+    # Line break
+    #     self.ln(20)
+
+    # Page footer
+    def footer(self):
+        # Position at 1.5 cm from bottom
+        self.set_y(-6.8)
+        self.set_font('Roboto', 'B', 12)
+        # Page number
+        self.cell(0, 10, 'Página ' + str(self.page_no()) + '/{nb}', 0, 0, 'C')
+
+
+# Instantiation of inherited class
+# pdf = PDF()
+# pdf.alias_nb_pages()
+# pdf.add_page()
+# pdf.set_font('Times', '', 12)
+# for i in range(1, 41):
+#     pdf.cell(0, 10, 'Printing line number ' + str(i), 0, 1)
+# pdf.output('tuto2.pdf', 'F')
+
+
 # Imprime uma lista de alunos em dívida e suas respectivas mensalidades atrasadas
-def gera_lista_dividas(lista):
-    rpdf = FPDF('P', 'cm', 'A4')
+
+
+def gera_lista_dividas(lista, mesano):
+    # lista: índice, nome, atraso
+    rpdf = PDF('P', 'cm', 'A4')
+    rpdf.alias_nb_pages()
     rpdf.add_page()
     rpdf.add_font('Roboto', '', 'Roboto-Regular.ttf', uni=True)
     rpdf.add_font('Roboto', 'I', 'Roboto-MediumItalic.ttf', uni=True)
@@ -190,12 +227,13 @@ def gera_lista_dividas(lista):
     rpdf.cell(0, 0.6, 'Rua Coronel Paiva, 12  Centro  Ouro Fino MG', 0, 2, 'C')
     # rpdf.line(1, 4.5, 20, 4.5)
     rpdf.set_font('Roboto', 'B', 14)
-    rpdf.cell(0.5, 1, '', 0, 1)
+    rpdf.cell(0.8, 1, '', 0, 1)
+    rpdf.cell(0.5, 1, 'Mês: ' + mesano, 0, 1)
     rpdf.cell(0.1, 1, '')
     rpdf.cell(2, 1, 'Índice')
     rpdf.cell(0.5, 1, '')
-    rpdf.cell(12.5, 1, 'Nome')
-    rpdf.cell(4.7, 1, 'Atrasado', 0, 1)
+    rpdf.cell(12.9, 1, 'Nome')
+    rpdf.cell(4.7, 1, 'Atraso', 0, 1)
     rpdf.set_font('Roboto', '', 14)
     tempx = 6
     for idx, x in enumerate(lista):
@@ -207,17 +245,17 @@ def gera_lista_dividas(lista):
         rpdf.cell(13.8, 0.6, tempstr)
         tempstr = str(x[2])
         rpdf.cell(5, 0.6, tempstr, 0, 1)
-        tempx = tempx + 0.6
-        rpdf.line(1, tempx, 20, tempx)
-        if tempx == 27.00000000000002:
-            tempx = -0.25
-        print(x[0], 'tempx ', tempx)
+        # tempx = tempx + 0.6
+        # rpdf.line(1, tempx, 20, tempx)
+        # if tempx == 27.00000000000002:
+        #     rpdf.cell(0, 10, 'Página %s' % rpdf.page_no(), 0, 0, 'C')
+        #     tempx = -0.25
+        # print(x[0], 'tempx ', tempx)
     # rpdf.cell(19, 10, 'Hello World!', 1)
     # rpdf.cell(40, 10, 'Hello World!', 1)
     # rpdf.cell(60, 10, 'Powered by FPDF.', 0, 1, 'C')
     # rpdf.output(arq_recibo, 'F')
     rpdf.output(arq_lista)
-
 
 
 def gera_relatorio_pdf(mes, ano, valortotal, templist):
@@ -271,5 +309,6 @@ produtos_venda = [
     ('08/06/2022', 'Chocolate branco', 'R$ 50,00')
 ]
 
+# gera_lista_dividas(produtos_venda, '07/2022')
 # recibo_vendas_pdf('Fulano', 'R$ 100,00', '08/07/2022', produtos_venda, 'Andréia')
-# os.system('\"' + pdfviewer + '\" ' + arq_recibo_vendas)
+# os.system('\"' + pdfviewer + '\" ' + arq_lista)
