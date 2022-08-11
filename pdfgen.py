@@ -7,6 +7,7 @@ arq_recibo = 'recibo.pdf'
 arq_relatorio = 'relatorio.pdf'
 arq_lista = 'lista.pdf'
 arq_recibo_vendas = 'vendas.pdf'
+arq_rel_mens = 'r_financeiro_mensal.pdf'
 
 
 # INICIO FUNCAO GERA RECIBO
@@ -302,6 +303,61 @@ def gera_relatorio_pdf(mes, ano, valortotal, templist):
     relpdf.cell(0, 0.6, str(tempstr), 0, 2, 'L')
     # relpdf.output(arq_relatorio, 'F')
     relpdf.output(arq_relatorio)
+
+
+# relatório da contabilidade do mês
+def gera_pdf_mes(listatmp, mestmp, valorfinal):
+    rpdf = PDF('P', 'cm', 'A4')
+    rpdf.add_page()
+    rpdf.alias_nb_pages()
+    rpdf.add_font('Roboto', '', 'Roboto-Regular.ttf', uni=True)
+    rpdf.add_font('Roboto', 'I', 'Roboto-MediumItalic.ttf', uni=True)
+    rpdf.add_font('Roboto', 'B', 'Roboto-Medium.ttf', uni=True)
+    rpdf.add_font('RobotoBold', 'B', 'Roboto-Bold.ttf', uni=True)
+    rpdf.set_font('RobotoBold', 'B', 14)
+    rpdf.image(imagem_peq, 16.6, 1.6)
+    rpdf.rect(1, 1, 19, 8.8, 'D')
+    rpdf.cell(0, 0.6, '', 0, 2, 'C')
+    string1 = 'RELATÓRIO FINANCEIRO DO MÊS DE {}'.format(mestmp.upper())
+    rpdf.cell(0, 0.6, string1, 0, 2, 'C')
+    rpdf.cell(0, 0.6, 'Lótus Condicionamento Dinâmico Integrado', 0, 2, 'C')
+    rpdf.cell(0, 0.6, 'Andréia de Cássia Gonçalves (CREF 020951-G/MG)', 0, 2, 'C')
+    rpdf.set_font('Roboto', 'I', 14)
+    rpdf.cell(0, 0.6, 'Rua Coronel Paiva, 12  Centro  Ouro Fino MG', 0, 2, 'C')
+    rpdf.line(1, 4.5, 20, 4.5)
+    rpdf.set_font('Roboto', '', 12)
+    rpdf.cell(0.5, 1, '', 0, 1)
+    rpdf.cell(0.5, 1, '')
+    rpdf.cell(0.4, 0.6, str(''), 0, 0, 'L')
+    rpdf.cell(1.8, 0.6, str('Data'), 0, 0, 'L')
+    rpdf.cell(1.5, 0.6, str('Tipo'), 0, 0, 'L')
+    rpdf.cell(6, 0.6, str('Categoria'), 0, 0, 'L')
+    rpdf.cell(6.8, 0.6, str('Descrição'), 0, 0, 'L')
+    rpdf.cell(6.8, 0.6, str('Valor'), 0, 1, 'L')
+    for idx, x in enumerate(listatmp):
+        # DATA
+        rpdf.cell(0.2, 0.6, str(''), 0, 0, 'L')
+        tempstr = x[1]
+        rpdf.cell(2.8, 0.6, str(tempstr), 0, 0, 'L')
+        # TIPO
+        tempstr = x[2]
+        tempstr = tempstr[0]
+        # relpdf.cell(0,0.6,str(tempstr),0,0,'R')
+        rpdf.cell(1, 0.6, str(tempstr), 0, 0, 'L')
+        # CATEGORIA
+        tempstr = x[3]
+        rpdf.cell(6, 0.6, str(tempstr), 0, 0, 'L')
+        # DESCRICAO
+        tempstr = x[4]
+        rpdf.cell(7.6, 0.6, str(tempstr), 0, 0, 'L')
+        # VALOR
+        tempstr = x[5]
+        rpdf.cell(1, 0.6, str(tempstr), 0, 1, 'R')
+    rpdf.cell(0.4, 0.6, str(''), 0, 1, 'L')
+    rpdf.cell(13.7, 0.6, str(''), 0, 0, 'L')
+    rpdf.cell(3.7, 0.6, str('Valor final:'), 0, 0, 'L')
+    rpdf.cell(1, 0.6, str(valorfinal), 0, 1, 'R')
+    rpdf.output(arq_rel_mens)
 
 
 produtos_venda = [

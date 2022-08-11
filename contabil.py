@@ -5,9 +5,8 @@ import sqlite3
 import calendar
 import locale
 import re
-
 from dateutil.relativedelta import relativedelta
-from fpdf import FPDF
+import pdfgen
 
 # from json import (load as jsonload, dump as jsondump)
 
@@ -33,7 +32,7 @@ dbhistorico = os.path.join(os.getcwd(), 'db', 'historico.db')
 dbsistema = os.path.join(os.getcwd(), 'db', 'sistema.db')
 mdbfile = os.path.join(os.getcwd(), 'db', 'mensalidades.db')
 pdfvw = os.path.join(os.getcwd(), 'recursos', 'SumatraPDF.exe')
-arq_rel_mens = 'rel_mensal.pdf'
+# arq_rel_mens = 'rel_mensal.pdf'
 regex_data = re.compile(r'\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{4}\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}\/\d{4}')
 regex_dinheiro = re.compile(r'^(\d{1,}\d+\,\d{2}?)$')
 
@@ -606,62 +605,6 @@ def mesatual():
     return res
 
 
-def gera_pdf_mes(listatmp, mestmp, valorfinal):
-    rpdf = FPDF('P', 'cm', 'A4')
-    rpdf.add_page()
-    rpdf.add_font('Calibri', 'I', 'Calibrii.ttf', uni=True)
-    rpdf.add_font('Calibri', 'B', 'Calibrib.ttf', uni=True)
-    rpdf.add_font('Calibri', '', 'Calibri.ttf', uni=True)
-    rpdf.set_font('Calibri', 'B', 14)
-    # rpdf.image(imagem_peq, 16.6, 1.6)
-    rpdf.rect(1, 1, 19, 8.8, 'D')
-    rpdf.cell(0, 0.6, '', 0, 2, 'C')
-    string1 = 'RELATÓRIO FINANCEIRO DO MÊS DE {}'.format(mestmp)
-    rpdf.cell(0, 0.6, string1, 0, 2, 'C')
-    rpdf.cell(0, 0.6, 'Lótus Condicionamento Dinâmico Integrado', 0, 2, 'C')
-    rpdf.cell(0, 0.6, 'Andréia de Cássia Gonçalves (CREF 020951-G/MG)', 0, 2, 'C')
-    rpdf.set_font('Calibri', 'I', 14)
-    rpdf.cell(0, 0.6, 'Rua Coronel Paiva, 12  Centro  Ouro Fino MG', 0, 2, 'C')
-    rpdf.line(1, 4.5, 20, 4.5)
-    rpdf.set_font('Calibri', 'B', 14)
-    rpdf.cell(0.5, 1, '', 0, 1)
-    rpdf.cell(0.5, 1, '')
-    rpdf.cell(0.4, 0.6, str(''), 0, 0, 'L')
-    rpdf.cell(1.8, 0.6, str('Data'), 0, 0, 'L')
-    rpdf.cell(1.5, 0.6, str('Tipo'), 0, 0, 'L')
-    rpdf.cell(6, 0.6, str('Categoria'), 0, 0, 'L')
-    rpdf.cell(6.8, 0.6, str('Descrição'), 0, 0, 'L')
-    rpdf.cell(6.8, 0.6, str('Valor'), 0, 1, 'L')
-    for idx, x in enumerate(listatmp):
-        # DATA
-        rpdf.cell(0.2, 0.6, str(''), 0, 0, 'L')
-        tempstr = x[1]
-        rpdf.cell(2.8, 0.6, str(tempstr), 0, 0, 'L')
-        # TIPO
-        tempstr = x[2]
-        tempstr = tempstr[0]
-        # relpdf.cell(0,0.6,str(tempstr),0,0,'R')
-        rpdf.cell(1, 0.6, str(tempstr), 0, 0, 'L')
-        # CATEGORIA
-        tempstr = x[3]
-        rpdf.cell(6, 0.6, str(tempstr), 0, 0, 'L')
-        # DESCRICAO
-        tempstr = x[4]
-        rpdf.cell(7.6, 0.6, str(tempstr), 0, 0, 'L')
-        # VALOR
-        tempstr = x[5]
-        rpdf.cell(1, 0.6, str(tempstr), 0, 1, 'R')
-    rpdf.cell(0.4, 0.6, str(''), 0, 1, 'L')
-    rpdf.cell(13.7, 0.6, str(''), 0, 0, 'L')
-    rpdf.cell(3.7, 0.6, str('Valor final:'), 0, 0, 'L')
-    rpdf.cell(1, 0.6, str(valorfinal), 0, 1, 'R')
-    # rpdf.cell(19, 10, 'Hello World!', 1)
-    # rpdf.cell(40, 10, 'Hello World!', 1)
-    # rpdf.cell(60, 10, 'Powered by FPDF.', 0, 1, 'C')
-    # rpdf.output(arq_recibo, 'F')
-    rpdf.output(arq_rel_mens)
-
-
 class Contabil:
     locale.setlocale(locale.LC_ALL, '')
     calendar.setfirstweekday(calendar.SUNDAY)
@@ -805,11 +748,12 @@ class Contabil:
             # print(self.values['-MES-'].rstrip())
             # tmpmesano = str(convmes(self.window['-MES-'])) + '/' + str(self.values['-ANO-'].rstrip())
             # self.window['-SALDO-'].Update(locale.currency(calcula(tmpmesano)))
-
+            # EDITANDO2
             if self.event in ('Relatório mensal', '-RELPDF-'):
                 mesano2 = str(convmes(self.values['-MES-'].rstrip())) + '/' + str(self.values['-ANO-'].rstrip())
-                gera_pdf_mes(le_movimento(mesano2), self.values['-MES-'].rstrip(), locale.currency(calcula(mesano2)))
-                self.window.perform_long_operation(lambda: os.system('\"' + pdfvw + '\" ' + arq_rel_mens),
+                pdfgen.gera_pdf_mes(le_movimento(mesano2), self.values['-MES-'].rstrip(),
+                                    locale.currency(calcula(mesano2)))
+                self.window.perform_long_operation(lambda: os.system('\"' + pdfvw + '\" ' + pdfgen.arq_rel_mens),
                                                    '-FUNCTION COMPLETED-')
 
             if self.event in ('-MES-', '-ANO-'):
@@ -867,7 +811,7 @@ class Contabil:
                         grava_recorrente(self.values['-DIAREC-'].rstrip(), tensai, self.values['-TIPOMOV-'].rstrip(),
                                          self.values['-DESCMOV-'].rstrip(), self.values['-VALORMOV-'].rstrip())
                         incorpora_tabelas(datetime.strftime(datetime.now(), '%m/%Y'))
-                        # mestmp = self.values['-DATAREC-'].rstrip() TODO Gravar recorrencia retroativamente
+                        # mestmp = self.values['-DATAREC-'].rstrip()
                     else:
                         grava_movimento(self.values['-DATAMOV-'].rstrip(), tensai, self.values['-TIPOMOV-'].rstrip(),
                                         self.values['-DESCMOV-'].rstrip(), self.values['-VALORMOV-'].rstrip(), 99)
@@ -1082,7 +1026,6 @@ class Contabil:
             ##########################################
             # TODO relatório anual
         self.window.close()
-
 
 # Ajustes feitos antes de rodar o programa
 # locale.setlocale(locale.LC_ALL, 'pt_BR')
