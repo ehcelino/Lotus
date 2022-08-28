@@ -44,8 +44,9 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
-# BACKUPS - IMPLEMENTAR
-# MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
+# OK ESCREVER PERDOAR MENSALIDADE
+# TESTAR - BACKUPS - IMPLEMENTAR <---------
+# OK MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
 # - intervalos - marcar quantos dias até a pessoa retornar do intervalo
 # - VALIDACAO de dados em todos os campos de entrada
 # - implementar log de erros de acordo com
@@ -87,6 +88,7 @@ import pdfgen
 # log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 # formatter = logging.Formatter(log_format)
 logging.basicConfig(filename='errorlog.txt', level=logging.DEBUG,
+                    filemode='a',
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
@@ -126,12 +128,13 @@ regexDinheiro = re.compile(r'^(\d{1,}\,\d{2}?)$')  # OK
 regexEmail = re.compile(r'^[\w\.]+@([\w-]+\.)+[\w-]{2,4}$')  # OK
 regexDia = re.compile(r'\b[0-3]{0,1}[0-9]{1}\b')  # OK
 regexDesconto = re.compile(r'\d\.\d{1,2}')
+regexData = re.compile(r'\d{2}/\d{2}/\d{4}')
 # arq_recibo = 'recibo.pdf'
 # arq_relatorio = 'relatorio.pdf'
 
 # REABILITAR A LINHA ABAIXO PARA O TEMA DE USUARIO
-# sg.theme(sg.user_settings_get_entry('-tema-'))
-sg.theme('Gray Gray Gray')
+sg.theme(sg.user_settings_get_entry('-tema-'))
+# sg.theme('Gray Gray Gray')
 calendar.setfirstweekday(calendar.SUNDAY)
 
 
@@ -249,6 +252,17 @@ def valida_cpf(cpf: str) -> bool:
 
 # FINAL FUNCAO VALIDA CPF
 
+# verifica se é a primeira execução do programa no dia atual. se for, exibe splashscreen e tela de porcentagem.
+def firstrun():
+    # sg.user_settings_set_entry('-datalastrun-', datetime.strftime(date.today() + relativedelta(days=-1), '%Y-%m-%d'))
+    tmp = sg.user_settings_get_entry('-datalastrun-', datetime.strftime(date.today(), '%Y-%m-%d'))
+    tmpdata = date.fromisoformat(tmp)
+    sg.user_settings_set_entry('-datalastrun-', datetime.strftime(date.today(), '%Y-%m-%d'))
+    if tmpdata < date.today():
+        return True
+    else:
+        return False
+
 
 # FUNCAO VERIFICA SE TABELA EXISTE
 def tableexists(dbcon, tablename):
@@ -286,7 +300,8 @@ def mensalidades_cria_tabela(index):
 
 # FUNCAO INSERE DADOS NA TABELA MENSALIDADE
 def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso):
-    # RETORNA 0 SE NAO EXISTIR O REGISTRO, 1 SE EXISTIR E FOR ATUALIZADO, 2 SE EXISTIR E JÁ FOI PAGO
+    # RETORNA 0 SE NAO EXISTIR O REGISTRO E FOR CRIADO, 1 SE EXISTIR E FOR ATUALIZADO, 2 SE EXISTIR E JÁ FOI PAGO
+    inserido = False
     inseredtultpgto = False
     dados = [mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso]
     conexao = sqlite3.connect(mdbfile)
@@ -297,6 +312,7 @@ def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrext
     comando = 'SELECT * FROM ' + nometabela
     c.execute(comando)
     cdados = c.fetchall()
+    print('cdados(select da tabela): ', cdados)
     if cdados:
         # se existe, checa se já foi pago
         for idx, x in enumerate(cdados):
@@ -311,8 +327,17 @@ def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrext
                 c.execute(comando, dadosupdt)
                 resultado = 1
                 inseredtultpgto = True
+                inserido = True
             if x[1] == mesano and x[8] == 1:
                 resultado = 2
+                inserido = True
+        if not inserido:
+            comando = 'INSERT INTO ' + nometabela + '(me_mesano,me_diaven,me_valor,me_datapgto' \
+                                                    ',me_vlrmulta,me_vlrextras,' \
+                                                    'me_vlrpago,me_pg,me_atraso) VALUES (?,?,?,?,?,?,?,?,?)'
+            c.execute(comando, dados)
+            resultado = 0
+            inseredtultpgto = False
     else:
         comando = 'INSERT INTO ' + nometabela + '(me_mesano,me_diaven,me_valor,me_datapgto' \
                                                 ',me_vlrmulta,me_vlrextras,' \
@@ -555,6 +580,7 @@ def mensalidades_relatorio(mesano):
 
 def mensalidades_porcentagem(mesano):
     conexao = sqlite3.connect(dbfile)
+    print('mesano', mesano)
     c = conexao.cursor()
     c.execute('SELECT al_index FROM Alunos')
     alunos = c.fetchall()
@@ -572,21 +598,26 @@ def mensalidades_porcentagem(mesano):
         comando = 'SELECT me_pg FROM ' + nometabela + ' WHERE me_mesano LIKE ?'
         c.execute(comando, (mesano,))
         temp = c.fetchone()
+        print('temp', temp)
         arraytmp.append(temp)
     # print('arraytmp: ', arraytmp[0][0])
     for idx, x in enumerate(arraytmp):
         if x is not None:
-            # print('x: ', x)
+            print('x: ', x)
             # final_x = x.translate({ord(c): None for c in "(,)"})
             if x[0] == 0:
                 naopago = naopago + 1
             else:
                 pago = pago + 1
     qtd_alunos = naopago + pago
-    # print('Pago: ', pago)
-    # print('Nao pago: ', naopago)
-    f_pago = (pago / qtd_alunos) * 100
-    f_npago = (naopago / qtd_alunos) * 100
+    f_pago, f_npago = 0.0, 0.0
+    if qtd_alunos != 0:
+        print('Pago: ', pago)
+        print('Nao pago: ', naopago)
+        if pago != 0:
+            f_pago = (pago / qtd_alunos) * 100
+        if naopago != 0:
+            f_npago = (naopago / qtd_alunos) * 100
     # print('Pagos: ', f_pago)
     # print('Não pagos: ', f_npago)
     return f_pago, f_npago, qtd_alunos
@@ -1323,7 +1354,8 @@ def buscar_aluno_index(indice):
 def splashscreen():
     imgfile = imagem
     display_time_milliseconds = 2000  # DISPLAY_TIME_MILLISECONDS
-    sg.Window('Window Title', [[sg.Image(filename=imgfile)]], transparent_color=sg.theme_background_color(),
+    sg.Window('Window Title', [[sg.Image(filename=imgfile)]],
+              transparent_color=sg.theme_background_color(),  # transparent_color='#f0f0f0'
               no_titlebar=True).read(timeout=display_time_milliseconds, close=True)  # keep_on_top=True
 
 
@@ -1406,14 +1438,15 @@ def backup_auto():
     pastabkp = str(sg.user_settings_get_entry('-bkpautopasta-')) + '/'
     nomearq = 'database-' + data
     arquivo = pastabkp + nomearq
-    data = datetime.now()
-    data = data.strftime("%d/%m/%Y")
-    sg.user_settings_set_entry('-lastbackup-', data)
     try:
         shutil.make_archive(base_name=arquivo, root_dir=enderecopai,
-                            base_dir=nomedapasta, format='zip')
+                            base_dir=nomedapasta, format='zip', logger=logger)
+        data = datetime.now()
+        data = data.strftime("%d/%m/%Y")
+        sg.user_settings_set_entry('-lastbackup-', data)
         return 0
-    except OSError:
+    except Exception as err:
+        logger.error(err, exc_info=True)
         print('Erro na criação do arquivo compactado.')
         return 1
 
@@ -1644,7 +1677,7 @@ class Configuracoes:
             [sg.Frame('Backup', layout=[
                 [sg.Checkbox('Fazer backup automático?', k='-FAZBKPAUTO-')],
                 [sg.T('Período: a cada'), sg.I(k='-PER-', s=(5, 1)), sg.T('dias.')],
-                [sg.T('Pasta de backup:'), sg.Push(), sg.I(k='-PASTA-', s=(40, 1)), sg.FolderBrowse('Procurar...')],
+                [sg.T('Pasta de backup:'), sg.Push(), sg.I(k='-PASTA-', s=(50, 1)), sg.FolderBrowse('Procurar...')],
                 [sg.T('Não esqueça de gravar suas alterações:'), sg.B('Gravar', k='-GRAVABACKUP-')],
                 [sg.T('Teste o funcionamento do backup se estiver ativado:'), sg.B('Fazer backup agora', k='-FAZBKP-')]
 
@@ -1652,9 +1685,10 @@ class Configuracoes:
         ]
 
         self.layout = [
-            [sg.Text('Configurações do sistema', font='_ 25', key='-TITULO-')],
+            [sg.Image(source=icones[1]),
+             sg.Text('Configurações do sistema', font='_ 25', key='-TITULO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
-            [sg.Column(self.coluna2), sg.Column(self.coluna1)],
+            [sg.Column(self.coluna2), sg.VPush(), sg.Column(self.coluna1)],
             [sg.Column(self.coluna3)],
             # [sg.Frame('', self.layframe)],
             [sg.Push(), sg.Button('Fechar', k='-FECHAR-')]
@@ -2307,11 +2341,13 @@ class grafico_mensal:
              sg.Text('Mensalidades em gráfico', font='_ 25', key='-NOMEALUNO-')],
             [sg.HorizontalSeparator(k='-SEP-')],
             [sg.Text('Percentual de mensalidades')],
-            [sg.T('Mês:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True)],
+            [sg.T('Mês:'), sg.Combo(meses, key='-MES-', default_value=mesatual(), enable_events=True, readonly=True)],
 
             # [sg.Text('Mês:'), sg.I(k='-MES-', s=(10, 1))],
-            [sg.Text('Mensalidades recebidas:'), sg.Text('', k='-REC-', background_color='green'),
-             sg.Push(), sg.Text('Mensalidades em haver:'), sg.Text('', k='-HAV-', background_color='red')],
+            [sg.Text('Mensalidades recebidas:'),
+             sg.Text('', k='-REC-', background_color='green', text_color='white'),
+             sg.Push(), sg.Text('Mensalidades em haver:'),
+             sg.Text('', k='-HAV-', background_color='red', text_color='white')],
             [sg.Frame('Gráfico', layout=self.layoutframe)],
             [sg.Push(), sg.Button('Voltar', k='-VOLTAR-')]
         ]
@@ -2322,6 +2358,7 @@ class grafico_mensal:
     def run(self):
         while True:
             if self.primeiro:
+                self.window['-MES-'].update(value=mesatual())
                 porcentagens = mensalidades_porcentagem(datetime.strftime(datetime.now(), '%m/%Y'))
                 self.pagos = porcentagens[0]
                 self.npagos = porcentagens[1]
@@ -2558,6 +2595,20 @@ class Pagamentos:
     tabela1larg = [0, 8, 8]
     tabela2header = ['Indice', 'Data', 'Descrição', 'Valor']
     tabela2larg = [0, 8, 20, 8]
+    row = []
+
+    def mensalidade_antiga(self):
+        layout = [
+            [sg.T('Entre com os dados da mensalidade')],
+            [sg.T('Data:'), sg.I(datetime.strftime(datetime.now(), '%d/%m/%Y'), s=(10, 1), k='-DATAMANTIGA-'),
+             sg.CalendarButton('Data do vencimento', locale='pt_BR', format='%d/%m/%Y',
+                               month_names=meses,
+                               day_abbreviations=dias,
+                               tooltip='Clique para mudar a data')],
+            [sg.T('Valor:'), sg.I(buscar_aluno_index(self.indicealuno)[8], k='-VALMANTIGA-', s=(10, 1))],
+            [sg.T(''), sg.Push(), sg.B('Criar', k='-CRIAMANTIGA-'), sg.B('Sair', k='-SAIR-')]
+        ]
+        return sg.Window('Mensalidade antiga', layout, finalize=True)
 
     def __init__(self):
         self.coluna1 = sg.Column([[sg.Frame('', [
@@ -2632,7 +2683,7 @@ class Pagamentos:
         ]
 
         self.window = sg.Window('Recebimento de mensalidade', self.layout,
-                                default_element_size=(12, 1), finalize=True, modal=True,
+                                default_element_size=(12, 1), finalize=True
                                 )
 
     def run(self):
@@ -2705,32 +2756,19 @@ class Pagamentos:
                 self.window.write_event_value('-TABELAMENSALIDADE-', self.linhatabela)
 
             if self.event == '-RECEBER-':
-                # print('valores do recebimento de mensalidade')
-                # print(self.indicealuno)
-                # print(self.mesano)
-                # print(self.diavencimento)
-                # print(self.valormensalidade)
-                # print(self.datapagto)
-                # print(self.valordesconto)
-                # print(self.valoresextras)
-                # print(self.valorfinal)
-                # print('1')
-                # print(self.atraso)
-                # print('tabela de vendas')
-                # print(self.indicealuno)
-                # print(self.mesano)
                 resultadotmp = mensalidades_insere(self.indicealuno, self.mesano,
                                                    self.diavencimento, self.valormensalidade,
                                                    self.datapagto, self.valordesconto,
                                                    self.valoresextras, self.valorfinal, 1, self.atraso)
+                for idx, x in enumerate(self.datasvendas):
+                    print('datasvendas x ', x)
+                    venda_recebe(self.indicealuno, x)
                 if resultadotmp in (0, 1):
                     sg.popup('Mensalidade recebida com sucesso.')
                     break
                 if resultadotmp == 2:
                     sg.popup('Esta mensalidade já foi paga.')
-                for idx, x in enumerate(self.datasvendas):
-                    # print('datasvendas x ', x)
-                    venda_recebe(self.indicealuno, x)
+                    break
 
             if self.event == '-IMPRIMIR-':
                 pdfgen.gera_recibo_pdf(self.nomealuno, locale.currency(self.valorfinal),
@@ -2738,6 +2776,65 @@ class Pagamentos:
                 self.window.perform_long_operation(
                     lambda: os.system('\"' + pdfviewer + '\" ' + pdfgen.arq_recibo),
                     '-FUNCTION COMPLETED-')
+
+            if self.event == '-PERDOA-':
+                if len(self.row) != 0:
+                    opcao, _ = sg.Window('Continuar?', [[sg.T('Tem certeza?')],
+                                                        [sg.Yes(s=10, button_text='Sim'),
+                                                         sg.No(s=10, button_text='Não')]], disable_close=True,
+                                         modal=True).read(close=True)
+                    if opcao == 'Sim':
+                        tmp2 = mensalidades_insere(
+                            self.indicealuno, self.mesano,
+                            self.diavencimento, self.valormensalidade,
+                            self.datapagto, self.valordesconto, self.valoresextras, 0.0, 1, self.atraso)
+                        if tmp2 == 1:
+                            sg.popup('Mensalidade já existe.')
+                        elif tmp2 == 2:
+                            sg.popup('Mensalidade já foi paga.')
+                        else:
+                            sg.popup('Mensalidade inserida com sucesso.')
+                else:
+                    sg.popup('Selecione um registro da tabela.')
+
+            if self.event == '-ANTIGA-':
+                self.windowa = self.mensalidade_antiga()
+                while True:
+                    self.eventa, self.valuesa = self.windowa.read()
+
+                    if self.eventa == '-CRIAMANTIGA-':
+                        if self.valuesa['-DATAMANTIGA-'] != '' and not \
+                                re.fullmatch(regexData, self.valuesa['-DATAMANTIGA-']):
+                            sg.popup('Data inválida.')
+                        elif self.valuesa['-VALMANTIGA-'] != '' and not \
+                                re.fullmatch(regexDinheiro, self.valuesa['-VALMANTIGA-']):
+                            sg.popup('Valor inválido.')
+                        else:
+                            print('entrou no else pra criar a mensalidade')
+                            mesano = self.valuesa['-DATAMANTIGA-'][3:]
+                            mensantiga = self.valuesa['-VALMANTIGA-']
+                            mensantiga = mensantiga.replace(',', '.')
+                            tmp2 = mensalidades_insere(
+                                self.indicealuno, mesano,
+                                buscar_aluno_index(self.indicealuno)[7],
+                                mensantiga, '', '', '', '', 0, '')
+                            print('saída da mensalidade:', tmp2)
+                            if tmp2 == 1:
+                                sg.popup('Mensalidade já existe.')
+                            elif tmp2 == 2:
+                                sg.popup('Mensalidade já foi paga.')
+                            else:
+                                sg.popup('Mensalidade inserida com sucesso.')
+                        tabelatmp = mensalidades_a_pagar(self.indicealuno)
+                        for idx, x in enumerate(tabelatmp):
+                            x[2] = locale.currency(float(x[2]))
+                        self.window['-TABELAMENSALIDADE-'].update(values=tabelatmp)
+                        break
+                    if self.eventa in (sg.WIN_CLOSED, '-SAIR-'):
+                        break
+
+                self.windowa.close()
+
         self.window.close()
 
 
@@ -2748,6 +2845,7 @@ class Principal:
     # ################################### CAD ALUNO
     formatodata = "%d/%m/%Y"
     res = True
+    first = True
     # ################################### CAD ALUNO
 
     # ####################################TEMA
@@ -2950,7 +3048,9 @@ class Principal:
     def run(self):
         global valtmp
         while True:
-
+            # if firstrun():
+            #     self.window.write_event_value('Gráfico', '')
+            #     splashscreen()
             # TESTE DO LOG DE ERROS
             # try:
             #    sprint('Vaggie')
@@ -3638,9 +3738,8 @@ class Principal:
                                 sg.popup('Campo nome não pode ser vazio.')
                             elif self.valuesinfo['-END-'].rstrip() == '':
                                 sg.popup('Campo endereço não pode ser vazio.')
-                            elif self.valuesinfo['-TEL1-'].rstrip() != '' and not re.fullmatch(regexTelefone,
-                                                                                               self.valuesinfo[
-                                                                                                   '-TEL1-'].rstrip()):
+                            elif self.valuesinfo['-TEL1-'].rstrip() != '' and \
+                                    not re.fullmatch(regexTelefone, self.valuesinfo['-TEL1-'].rstrip()):
                                 sg.popup('Telefone deve ser no formato (xx)xxxxx-xxxx')
                             # elif self.valuesinfo['-CPF-'].rstrip() != '' and not \
                             #         re.fullmatch(regexCPF, self.valuesinfo['-CPF-'].rstrip()):
