@@ -44,6 +44,11 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
+
+# VERIFICAR BACKUP COMPLETO, FAZENDO O BKP DO LUGAR ERRADO CRIANDO ARQUIVO ENORME
+# CORES NA TABELA PRINCIPAL NAO ESTAO FUNCIONANDO <---------------------------------- 28/08
+# OK ALTERAR VALOR DA MENSALIDADE NA HORA DE INSERIR
+# OK PERDOAR MENSALIDADE FUNCIONANDO ERRADO
 # OK ESCREVER PERDOAR MENSALIDADE
 # TESTAR - BACKUPS - IMPLEMENTAR <---------
 # OK MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
@@ -298,9 +303,23 @@ def mensalidades_cria_tabela(index):
     conexao.close()
 
 
-# FUNCAO INSERE DADOS NA TABELA MENSALIDADE
+
 def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso):
-    # RETORNA 0 SE NAO EXISTIR O REGISTRO E FOR CRIADO, 1 SE EXISTIR E FOR ATUALIZADO, 2 SE EXISTIR E JÁ FOI PAGO
+    """
+    Insere dados na tabela mensalidade
+    :param index:
+    :param mesano:
+    :param diaven:
+    :param valor:
+    :param datapgto:
+    :param vlrmulta:
+    :param vlrextras:
+    :param vlrpago:
+    :param pg:
+    :param atraso:
+    :return: 0 se não existir e for criado, 1 se existir e atualizado, 2 se existir e já pago
+    """
+
     inserido = False
     inseredtultpgto = False
     dados = [mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso]
@@ -2628,24 +2647,25 @@ class Pagamentos:
                 bind_return_key=True,
                 select_mode=sg.TABLE_SELECT_MODE_BROWSE
             )],
-        ], size=(250, 180)), ], [
-                                      sg.Frame('', [
-                                          # sg.T('Data do pagamento:'),
-                                          [sg.CalendarButton('Data do pagamento', locale='pt_BR', format='%d/%m/%Y',
-                                                             month_names=meses,
-                                                             day_abbreviations=dias,
-                                                             tooltip='Clique para mudar a data'), sg.Push(),
-                                           sg.Input(k='-DATAPAGTO-', size=(10, 1),
-                                                    default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'),
-                                                    enable_events=True),
-                                           ],
-                                          # [sg.T('Valor recebido:'), sg.Push(),
-                                          # sg.I(s=(10, 1), k='-VALORRECEBIDO-', justification='right',
-                                          #      focus=True, enable_events=True)],
-                                          # [sg.T('Troco:'), sg.Push(),
-                                          #  sg.I(s=(10, 1), k='-TROCO-', justification='right')],
-                                      ], size=(250, 100)),
-                                  ]])
+        ], size=(250, 180)), ],
+            [
+              sg.Frame('', [
+                  # sg.T('Data do pagamento:'),
+                  [sg.CalendarButton('Data do pagamento', locale='pt_BR', format='%d/%m/%Y',
+                                     month_names=meses,
+                                     day_abbreviations=dias,
+                                     tooltip='Clique para mudar a data'), sg.Push(),
+                   sg.Input(k='-DATAPAGTO-', size=(10, 1),
+                            default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                            enable_events=True),
+                   ],
+                  # [sg.T('Valor recebido:'), sg.Push(),
+                  # sg.I(s=(10, 1), k='-VALORRECEBIDO-', justification='right',
+                  #      focus=True, enable_events=True)],
+                  # [sg.T('Troco:'), sg.Push(),
+                  #  sg.I(s=(10, 1), k='-TROCO-', justification='right')],
+              ], size=(250, 100)),
+          ]])
 
         self.coluna2 = sg.Column([[sg.Frame('', [
             [sg.T('Valores a receber')],
@@ -2663,9 +2683,12 @@ class Pagamentos:
                       bind_return_key=True,
                       select_mode=sg.TABLE_SELECT_MODE_BROWSE
                       )],
+            [sg.Push(), sg.T('Alterar valor:'),
+             sg.I(k='-VALORALT-', s=(10, 1), justification='right'),
+             sg.B('Alterar', k='-ALTERA-')],
             [sg.Push(), sg.T('Total:', font='_ 18'), sg.I(k='-VALORFINAL-', s=(10, 1), font='_ 18',
                                                           justification='right')],
-            [sg.Push(), sg.B('Imprimir', k='-IMPRIMIR-'), sg.B('Receber', k='-RECEBER-')]
+            [sg.Push(), sg.B('Imprimir', k='-IMPRIMIR-', font='_ 18'), sg.B('Receber', k='-RECEBER-', font='_ 18')]
         ], size=(400, 287)), ]])
 
         self.coluna3 = sg.Column([[sg.Frame('', [
@@ -2703,72 +2726,88 @@ class Pagamentos:
 
             if self.event == '-TABELAMENSALIDADE-':
                 self.row = self.values[self.event]
-                self.linhatabela = self.row
-                self.dados = self.window['-TABELAMENSALIDADE-'].Values
-                tblmensalidade = self.dados[self.row[0]]
-                # print(tblmensalidade)
-                self.mesano = tblmensalidade[1]
-                self.mesano = self.mesano[3:]
-                self.diavencimento = tblmensalidade[0]
-                mensalidade = tblmensalidade[2].translate({ord(c): None for c in "R$"})
-                mensalidade = mensalidade.replace(',', '.')
-                self.valormensalidade = float(mensalidade)
-                self.valorfinal = self.valormensalidade
-                self.valordesconto = sg.user_settings_get_entry('-valordesconto-')
-                datapagto = datetime.strptime(self.window['-DATAPAGTO-'].get(), '%d/%m/%Y')
-                datavencimento = datetime.strptime(tblmensalidade[1], '%d/%m/%Y')
-                self.datavencimento = tblmensalidade[1]
-                self.datapagto = self.window['-DATAPAGTO-'].get()
-                entradastabela = [[99, self.window['-DATAPAGTO-'].get(),
-                                   ('Mensalidade de ' + self.mesano), locale.currency(self.valormensalidade)]]
-                # print('datapagto ', datapagto)
-                # print('datavencimento ', datavencimento)
-                self.atraso = diferenca_datas(tblmensalidade[1], self.window['-DATAPAGTO-'].get())
-                self.desconto_familia = buscar_aluno_index(self.indicealuno)[13]
-                print(self.desconto_familia)
-                if self.desconto_familia != 0.0 and self.desconto_familia:
-                    print('entrou no desconto familia')
-                    self.valor_desconto_f = float(self.valormensalidade) * float(self.desconto_familia)
-                    print('valor desc fam: ', self.valor_desconto_f)
-                    self.valorfinal = float(self.valormensalidade) - float(self.valor_desconto_f)
-                    print('valor final: ', self.valorfinal)
-                    entradastabela.append([50, self.window['-DATAPAGTO-'].get(),
-                                           'Desconto família', locale.currency(self.valor_desconto_f)])
-                if self.valordesconto != 0.0:
-                    if datapagto < datavencimento:
-                        self.valorfinal = float(self.valormensalidade) - self.valordesconto
+                print(self.row)
+                if len(self.row) != 0:
+                    self.linhatabela = self.row
+                    self.dados = self.window['-TABELAMENSALIDADE-'].Values
+                    print(self.dados[self.row[0]])
+                    tblmensalidade = self.dados[self.row[0]]
+                    # print(tblmensalidade)
+                    self.mesano = tblmensalidade[1]
+                    self.mesano = self.mesano[3:]
+                    self.diavencimento = tblmensalidade[0]
+                    mensalidade = tblmensalidade[2].translate({ord(c): None for c in "R$"})
+                    mensalidade = mensalidade.replace(',', '.')
+                    self.valormensalidade = float(mensalidade)
+                    self.valorfinal = self.valormensalidade
+                    self.valordesconto = sg.user_settings_get_entry('-valordesconto-')
+                    datapagto = datetime.strptime(self.window['-DATAPAGTO-'].get(), '%d/%m/%Y')
+                    datavencimento = datetime.strptime(tblmensalidade[1], '%d/%m/%Y')
+                    self.datavencimento = tblmensalidade[1]
+                    self.datapagto = self.window['-DATAPAGTO-'].get()
+                    entradastabela = [[99, self.window['-DATAPAGTO-'].get(),
+                                       ('Mensalidade de ' + self.mesano), locale.currency(self.valormensalidade)]]
+                    # print('datapagto ', datapagto)
+                    # print('datavencimento ', datavencimento)
+                    self.atraso = diferenca_datas(tblmensalidade[1], self.window['-DATAPAGTO-'].get())
+                    self.desconto_familia = buscar_aluno_index(self.indicealuno)[13]
+                    print(self.desconto_familia)
+                    if self.desconto_familia != 0.0 and self.desconto_familia:
+                        print('entrou no desconto familia')
+                        self.valor_desconto_f = float(self.valormensalidade) * float(self.desconto_familia)
+                        print('valor desc fam: ', self.valor_desconto_f)
+                        self.valorfinal = float(self.valormensalidade) - float(self.valor_desconto_f)
+                        print('valor final: ', self.valorfinal)
                         entradastabela.append([50, self.window['-DATAPAGTO-'].get(),
-                                               'Desconto', locale.currency(self.valordesconto)])
-                self.vendas = venda_busca(self.indicealuno)
-                if self.vendas:
-                    for idx, x in enumerate(self.vendas):
-                        if x[4] == 'SIM':
-                            self.datasvendas.append(x[1])
-                            tmp = x[3].replace(',', '.')
-                            entradastabela.append([x[0], x[1], x[2], locale.currency(float(tmp))])
-                            self.valoresextras = self.valoresextras + float(tmp)
-                            self.valorfinal = self.valorfinal + float(tmp)
-                self.window['-TABELAVALORES-'].update(values=entradastabela)
-                self.window['-VALORFINAL-'].update(locale.currency(self.valorfinal))
+                                               'Desconto família', locale.currency(self.valor_desconto_f)])
+                    if self.valordesconto != 0.0:
+                        if datapagto < datavencimento:
+                            self.valorfinal = float(self.valormensalidade) - self.valordesconto
+                            entradastabela.append([50, self.window['-DATAPAGTO-'].get(),
+                                                   'Desconto', locale.currency(self.valordesconto)])
+                    self.vendas = venda_busca(self.indicealuno)
+                    if self.vendas:
+                        for idx, x in enumerate(self.vendas):
+                            if x[4] == 'SIM':
+                                self.datasvendas.append(x[1])
+                                tmp = x[3].replace(',', '.')
+                                entradastabela.append([x[0], x[1], x[2], locale.currency(float(tmp))])
+                                self.valoresextras = self.valoresextras + float(tmp)
+                                self.valorfinal = self.valorfinal + float(tmp)
+                    self.window['-TABELAVALORES-'].update(values=entradastabela)
+                    self.window['-VALORFINAL-'].update(locale.currency(self.valorfinal))
+                else:
+                    pass
+                # EDITANDO3
                 # print(self.valorfinal)
 
             if self.event == '-DATAPAGTO-':
                 self.window.write_event_value('-TABELAMENSALIDADE-', self.linhatabela)
+
+            if self.event == '-ALTERA-':
+                if self.values['-VALORALT-'] != '' and re.fullmatch(regexDinheiro, self.values['-VALORALT-']):
+                    opcao, _ = sg.Window('Continuar?', [[sg.T('Tem certeza que deseja alterar o valor final?')],
+                                                        [sg.Yes(s=10, button_text='Sim'),
+                                                         sg.No(s=10, button_text='Não')]], disable_close=True,
+                                         modal=True).read(close=True)
+                    if opcao == 'Sim':
+                        temp = self.values['-VALORALT-']
+                        temp = temp.replace(',', '.')
+                        self.window['-VALORFINAL-'].update(locale.currency(float(temp)))
+                        self.valorfinal = float(temp)
 
             if self.event == '-RECEBER-':
                 resultadotmp = mensalidades_insere(self.indicealuno, self.mesano,
                                                    self.diavencimento, self.valormensalidade,
                                                    self.datapagto, self.valordesconto,
                                                    self.valoresextras, self.valorfinal, 1, self.atraso)
-                for idx, x in enumerate(self.datasvendas):
-                    print('datasvendas x ', x)
-                    venda_recebe(self.indicealuno, x)
                 if resultadotmp in (0, 1):
                     sg.popup('Mensalidade recebida com sucesso.')
-                    break
+                    for idx, x in enumerate(self.datasvendas):
+                        print('datasvendas x ', x)
+                        venda_recebe(self.indicealuno, x)
                 if resultadotmp == 2:
                     sg.popup('Esta mensalidade já foi paga.')
-                    break
 
             if self.event == '-IMPRIMIR-':
                 pdfgen.gera_recibo_pdf(self.nomealuno, locale.currency(self.valorfinal),
@@ -2788,12 +2827,18 @@ class Pagamentos:
                             self.indicealuno, self.mesano,
                             self.diavencimento, self.valormensalidade,
                             self.datapagto, self.valordesconto, self.valoresextras, 0.0, 1, self.atraso)
-                        if tmp2 == 1:
-                            sg.popup('Mensalidade já existe.')
-                        elif tmp2 == 2:
-                            sg.popup('Mensalidade já foi paga.')
-                        else:
-                            sg.popup('Mensalidade inserida com sucesso.')
+                        # if tmp2 == 1:
+                        #     sg.popup('Mensalidade já existe.')
+                        # elif tmp2 == 2:
+                        #     sg.popup('Mensalidade já foi paga.')
+                        # else:
+                        #     sg.popup('Mensalidade inserida com sucesso.')
+                        tabelatmp = mensalidades_a_pagar(self.indicealuno)
+                        for idx, x in enumerate(tabelatmp):
+                            x[2] = locale.currency(float(x[2]))
+                        self.window['-TABELAMENSALIDADE-'].update(values=tabelatmp)
+                        self.window['-TABELAVALORES-'].update(values=[])
+                        self.window['-VALORFINAL-'].update(value='')
                 else:
                     sg.popup('Selecione um registro da tabela.')
 
