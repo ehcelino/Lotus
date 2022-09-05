@@ -45,12 +45,13 @@ import pdfgen
 #
 # A FAZER
 
-# VERIFICAR BACKUP COMPLETO, FAZENDO O BKP DO LUGAR ERRADO CRIANDO ARQUIVO ENORME
-# CORES NA TABELA PRINCIPAL NAO ESTAO FUNCIONANDO <---------------------------------- 28/08
+# BACKUPS PARECEM FUNCIONAR OK, PRECISA DE MAIS TESTES
+# OK VERIFICAR BACKUP COMPLETO, FAZENDO O BKP DO LUGAR ERRADO CRIANDO ARQUIVO ENORME
+# OK CORES NA TABELA PRINCIPAL NAO ESTAO FUNCIONANDO <---------------------------------- 28/08
 # OK ALTERAR VALOR DA MENSALIDADE NA HORA DE INSERIR
 # OK PERDOAR MENSALIDADE FUNCIONANDO ERRADO
 # OK ESCREVER PERDOAR MENSALIDADE
-# TESTAR - BACKUPS - IMPLEMENTAR <---------
+# OK TESTAR - BACKUPS - IMPLEMENTAR <---------
 # OK MENSALIDADE MESES PASSADOS - NO MOMENTO NÃO DÁ PRA RECEBER DE QUEM É CADASTRADO NO MÊS SEGUINTE
 # - intervalos - marcar quantos dias até a pessoa retornar do intervalo
 # - VALIDACAO de dados em todos os campos de entrada
@@ -2687,8 +2688,9 @@ class Pagamentos:
              sg.I(k='-VALORALT-', s=(10, 1), justification='right'),
              sg.B('Alterar', k='-ALTERA-')],
             [sg.Push(), sg.T('Total:', font='_ 18'), sg.I(k='-VALORFINAL-', s=(10, 1), font='_ 18',
-                                                          justification='right')],
-            [sg.Push(), sg.B('Imprimir', k='-IMPRIMIR-', font='_ 18'), sg.B('Receber', k='-RECEBER-', font='_ 18')]
+                                                          justification='right'),
+             sg.B('Receber', k='-RECEBER-', font='_ 18')],
+            [sg.Push(), sg.B('Imprimir recibo', k='-IMPRIMIR-'), ]
         ], size=(400, 287)), ]])
 
         self.coluna3 = sg.Column([[sg.Frame('', [
@@ -2806,6 +2808,12 @@ class Pagamentos:
                     for idx, x in enumerate(self.datasvendas):
                         print('datasvendas x ', x)
                         venda_recebe(self.indicealuno, x)
+                    tabelatmp = mensalidades_a_pagar(self.indicealuno)
+                    for idx, x in enumerate(tabelatmp):
+                        x[2] = locale.currency(float(x[2]))
+                    self.window['-TABELAMENSALIDADE-'].update(values=tabelatmp)
+                    self.window['-TABELAVALORES-'].update(values=[])
+                    self.window['-VALORFINAL-'].update(value='')
                 if resultadotmp == 2:
                     sg.popup('Esta mensalidade já foi paga.')
 
@@ -3090,6 +3098,50 @@ class Principal:
         self.window.bind('<F1>', 'Tela principal')
         # self.window.Maximize()
 
+    def configura_tabela(self):
+        indice = 0
+        tmptabela = self.window['-TABELA-'].Values
+        tabela_final = sort_table(tmptabela, (1,))
+        print(tabela_final)
+        self.window['-TABELA-'].Update(values=tabela_final)
+        tmptabela = self.window['-TABELA-'].Values
+        for idx, x in enumerate(tmptabela):
+            atrasado = mensalidades_atraso(x[0])
+            print(x[0])
+            print('atrasado', atrasado)
+            if atrasado:
+                print('passou pelo if')
+                self.window['-TABELA-'].Update(
+                    row_colors=[[indice, sg.user_settings_get_entry('-cormensatraso-')]])
+            elif buscar_aluno_index(x[0])[10] == 'N':
+                self.window['-TABELA-'].Update(
+                    row_colors=[[indice, sg.user_settings_get_entry('-coralunoinativo-')]])
+                # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+            else:
+                print('passou pelo else')
+                self.window['-TABELA-'].Update(
+                    row_colors=[[indice, 'white']])  # aqui deixei branco pq o tema não tem cor de fundo
+            indice = indice + 1
+        tmptabela = self.window['-TABELA-'].Values
+        indice = 0
+        for idx, x in enumerate(tmptabela):
+            # print(x[0])
+            dttemp = planos_acabando(x[0])
+            # print(dttemp)
+            if dttemp is not None and dttemp != '':
+                dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+                dthoje = datetime.now()
+                deltafim = dtatual - dthoje
+                # print(deltafim.days)
+                diasfim = int(deltafim.days)
+                if diasfim < 30:
+                    self.window['-TABELA-'].Update(
+                        row_colors=[[indice, sg.user_settings_get_entry('-corplanofinal-')]])
+                    # self.window['-CAIXA-'].print(
+                    #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
+                self.planos_acabando.append((x[0], diasfim))
+            indice = indice + 1
+
     def run(self):
         global valtmp
         while True:
@@ -3117,47 +3169,50 @@ class Principal:
                         sg.popup('Atenção: houve uma falha na criação do backup dos bancos de dados.')
                 self.window['-STATUS-'].update('Último backup realizado há ' + str(tempobkp) + ' dias atrás.')
 
-            tmptabela = self.window['-TABELA-'].Values
-            # print(self.window['-TABELA-'].Values)
-            if self.sort:
-                tabela_final = sort_table(tmptabela, (1,))
-                self.window['-TABELA-'].Update(values=tabela_final)
-                self.sort = False
-            tmptabela = self.window['-TABELA-'].Values
             if self.atrasados:
-                indice = 0
-                for idx, x in enumerate(tmptabela):
-                    atrasado = mensalidades_atraso(x[0])
-                    if atrasado:
-                        self.window['-TABELA-'].Update(
-                            row_colors=[[indice, sg.user_settings_get_entry('-cormensatraso-')]])
-                    elif buscar_aluno_index(x[0])[10] == 'N':
-                        self.window['-TABELA-'].Update(
-                            row_colors=[[indice, sg.user_settings_get_entry('-coralunoinativo-')]])
-                        # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
-                    indice = indice + 1
+                Principal.configura_tabela(self)
                 self.atrasados = False
-            if self.planos_fim:
-                indice = 0
-                for idx, x in enumerate(tmptabela):
-                    # print(x[0])
-                    dttemp = planos_acabando(x[0])
-                    # print(dttemp)
-                    if dttemp is not None and dttemp != '':
-                        dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
-                        dthoje = datetime.now()
-                        deltafim = dtatual - dthoje
-                        # print(deltafim.days)
-                        diasfim = int(deltafim.days)
-                        if diasfim < 30:
-                            self.window['-TABELA-'].Update(
-                                row_colors=[[indice, sg.user_settings_get_entry('-corplanofinal-')]])
-                            # self.window['-CAIXA-'].print(
-                            #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
-                        self.planos_acabando.append((x[0], diasfim))
-                    indice = indice + 1
-                # print(self.planos_acabando)
-                self.planos_fim = False
+
+            # tmptabela = self.window['-TABELA-'].Values
+            # if self.sort:
+            #     tabela_final = sort_table(tmptabela, (1,))
+            #     self.window['-TABELA-'].Update(values=tabela_final)
+            #     self.sort = False
+            # tmptabela = self.window['-TABELA-'].Values
+            # if self.atrasados:  # EDITANDO3
+            #     indice = 0
+            #     for idx, x in enumerate(tmptabela):
+            #         atrasado = mensalidades_atraso(x[0])
+            #         if atrasado:
+            #             self.window['-TABELA-'].Update(
+            #                 row_colors=[[indice, sg.user_settings_get_entry('-cormensatraso-')]])
+            #         elif buscar_aluno_index(x[0])[10] == 'N':
+            #             self.window['-TABELA-'].Update(
+            #                 row_colors=[[indice, sg.user_settings_get_entry('-coralunoinativo-')]])
+            #             # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+            #         indice = indice + 1
+            #     self.atrasados = False
+            # if self.planos_fim:
+            #     indice = 0
+            #     for idx, x in enumerate(tmptabela):
+            #         # print(x[0])
+            #         dttemp = planos_acabando(x[0])
+            #         # print(dttemp)
+            #         if dttemp is not None and dttemp != '':
+            #             dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+            #             dthoje = datetime.now()
+            #             deltafim = dtatual - dthoje
+            #             # print(deltafim.days)
+            #             diasfim = int(deltafim.days)
+            #             if diasfim < 30:
+            #                 self.window['-TABELA-'].Update(
+            #                     row_colors=[[indice, sg.user_settings_get_entry('-corplanofinal-')]])
+            #                 # self.window['-CAIXA-'].print(
+            #                 #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
+            #             self.planos_acabando.append((x[0], diasfim))
+            #         indice = indice + 1
+            #     # print(self.planos_acabando)
+            #     self.planos_fim = False
 
             self.event, self.values = self.window.read()
             # print(self.event,self.values)
@@ -3882,33 +3937,34 @@ class Principal:
                                             busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), True)
                                         else:
                                             busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), False)
-                                        tabela_final = sort_table(tmptabela, (1,))
-                                        self.window['-TABELA-'].Update(values=tabela_final)
-                                        self.window['-TABELA-'].update(values=busca)
-                                        indice = 0
-                                        for idx, x in enumerate(tmptabela):
-                                            atrasado = mensalidades_atraso(x[0])  # EDITANDO CORES DA TABELA
-                                            if atrasado:
-                                                self.window['-TABELA-'].Update(row_colors=[
-                                                    [indice, sg.user_settings_get_entry('-cormensatraso-')]])
-                                                # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
-                                            indice = indice + 1
-                                        indice = 0
-                                        for idx, x in enumerate(tmptabela):
-                                            # print(x[0])
-                                            dttemp = planos_acabando(x[0])
-                                            # print(dttemp)
-                                            if dttemp is not None and dttemp != '':
-                                                dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
-                                                dthoje = datetime.now()
-                                                deltafim = dtatual - dthoje
-                                                # print(deltafim.days)
-                                                diasfim = int(deltafim.days)
-                                                if diasfim < 30:
-                                                    self.window['-TABELA-'].Update(row_colors=[
-                                                        [indice, sg.user_settings_get_entry('-corplanofinal-')]])
-                                                self.planos_acabando.append((x[0], diasfim))
-                                            indice = indice + 1
+                                        Principal.configura_tabela(self)
+                                        # tabela_final = sort_table(tmptabela, (1,))
+                                        # self.window['-TABELA-'].Update(values=tabela_final)
+                                        # self.window['-TABELA-'].update(values=busca)
+                                        # indice = 0
+                                        # for idx, x in enumerate(tmptabela):
+                                        #     atrasado = mensalidades_atraso(x[0])  # EDITANDO CORES DA TABELA
+                                        #     if atrasado:
+                                        #         self.window['-TABELA-'].Update(row_colors=[
+                                        #             [indice, sg.user_settings_get_entry('-cormensatraso-')]])
+                                        #         # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+                                        #     indice = indice + 1
+                                        # indice = 0
+                                        # for idx, x in enumerate(tmptabela):
+                                        #     # print(x[0])
+                                        #     dttemp = planos_acabando(x[0])
+                                        #     # print(dttemp)
+                                        #     if dttemp is not None and dttemp != '':
+                                        #         dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+                                        #         dthoje = datetime.now()
+                                        #         deltafim = dtatual - dthoje
+                                        #         # print(deltafim.days)
+                                        #         diasfim = int(deltafim.days)
+                                        #         if diasfim < 30:
+                                        #             self.window['-TABELA-'].Update(row_colors=[
+                                        #                 [indice, sg.user_settings_get_entry('-corplanofinal-')]])
+                                        #         self.planos_acabando.append((x[0], diasfim))
+                                        #     indice = indice + 1
                                     else:
                                         if self.values['-ATIVOS-']:
                                             temp = ler_todos_dados_ativos()
@@ -3917,36 +3973,37 @@ class Principal:
                                         # temp = ler_todos_dados()
 
                                         self.window['-TABELA-'].update(values=temp)
-                                        # CODIGO PARA AS CORES DA TABELA
-                                        tabela_final = sort_table(tmptabela, (1,))
-                                        self.window['-TABELA-'].Update(values=tabela_final)
-                                        tmptabela = self.window['-TABELA-'].Values
-                                        indice = 0
-                                        for idx, x in enumerate(tmptabela):
-                                            atrasado = mensalidades_atraso(x[0])
-                                            if atrasado:
-                                                self.window['-TABELA-'].Update(row_colors=[
-                                                    [indice, sg.user_settings_get_entry('-cormensatraso-')]])
-                                                # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
-                                            indice = indice + 1
-                                        indice = 0
-                                        for idx, x in enumerate(tmptabela):
-                                            # print(x[0])  # EDITANDO
-                                            dttemp = planos_acabando(x[0])
-                                            # print(dttemp)
-                                            if dttemp is not None and dttemp != '':
-                                                dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
-                                                dthoje = datetime.now()
-                                                deltafim = dtatual - dthoje
-                                                print(deltafim.days)
-                                                diasfim = int(deltafim.days)
-                                                if diasfim < 30:
-                                                    self.window['-TABELA-'].Update(row_colors=[
-                                                        [indice, sg.user_settings_get_entry('-corplanofinal-')]])
-                                                    # self.window['-CAIXA-'].print( 'O plano de ' + x[1] + ' tem ' +
-                                                    # str(diasfim) + ' dias para acabar.')
-                                                self.planos_acabando.append((x[0], diasfim))
-                                            indice = indice + 1
+                                        Principal.configura_tabela(self)
+                                        # # CODIGO PARA AS CORES DA TABELA
+                                        # tabela_final = sort_table(tmptabela, (1,))
+                                        # self.window['-TABELA-'].Update(values=tabela_final)
+                                        # tmptabela = self.window['-TABELA-'].Values
+                                        # indice = 0
+                                        # for idx, x in enumerate(tmptabela):
+                                        #     atrasado = mensalidades_atraso(x[0])
+                                        #     if atrasado:
+                                        #         self.window['-TABELA-'].Update(row_colors=[
+                                        #             [indice, sg.user_settings_get_entry('-cormensatraso-')]])
+                                        #         # self.window['-CAIXA-'].print('Aluno ' + x[1] + ' em atraso.')
+                                        #     indice = indice + 1
+                                        # indice = 0
+                                        # for idx, x in enumerate(tmptabela):
+                                        #     # print(x[0])  # EDITANDO
+                                        #     dttemp = planos_acabando(x[0])
+                                        #     # print(dttemp)
+                                        #     if dttemp is not None and dttemp != '':
+                                        #         dtatual = datetime.strptime(dttemp, '%d/%m/%Y')
+                                        #         dthoje = datetime.now()
+                                        #         deltafim = dtatual - dthoje
+                                        #         print(deltafim.days)
+                                        #         diasfim = int(deltafim.days)
+                                        #         if diasfim < 30:
+                                        #             self.window['-TABELA-'].Update(row_colors=[
+                                        #                 [indice, sg.user_settings_get_entry('-corplanofinal-')]])
+                                        #             # self.window['-CAIXA-'].print( 'O plano de ' + x[1] + ' tem ' +
+                                        #             # str(diasfim) + ' dias para acabar.')
+                                        #         self.planos_acabando.append((x[0], diasfim))
+                                        #     indice = indice + 1
                                     sg.Popup('Alterações efetuadas com sucesso.')
 
                         #########################################
@@ -4046,10 +4103,11 @@ class Principal:
                     busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()), False)
                 # busca = buscar_por_nome(str(self.values['-BUSCAR-'].rstrip()))
                 # print(busca)
-                self.atrasados = True
-                self.planos_fim = True
-                self.sort = True
+                # self.atrasados = True
+                # self.planos_fim = True
+                # self.sort = True
                 self.window['-TABELA-'].update(values=busca)
+                Principal.configura_tabela(self)
 
             # if self.event == '-ATUALIZAR-':
             #    sg.popup_non_blocking('Popup', *self.values['-ATUALIZAR-'])
@@ -4063,10 +4121,11 @@ class Principal:
                 else:
                     busca = ler_todos_dados()
                 # print(busca)
-                self.atrasados = True
-                self.planos_fim = True
-                self.sort = True
+                # self.atrasados = True
+                # self.planos_fim = True
+                # self.sort = True
                 self.window['-TABELA-'].update(values=busca)
+                Principal.configura_tabela(self)
 
             ##################################################
             #             JANELA CADASTRO ALUNO
@@ -4229,9 +4288,10 @@ class Principal:
                             else:
                                 temp = ler_todos_dados()
                             # temp = ler_todos_dados()
-                            self.atrasados = True
-                            self.planos_fim = True
+                            # self.atrasados = True
+                            # self.planos_fim = True
                             self.window['-TABELA-'].update(values=temp)
+                            Principal.configura_tabela(self)
                 self.window2.close()
 
             ##################################################
