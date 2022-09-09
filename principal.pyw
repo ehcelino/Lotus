@@ -599,8 +599,12 @@ def mensalidades_relatorio(mesano):
 
 
 def mensalidades_porcentagem(mesano):
+    """
+    Entrega dados para a criação do gráfico de pagamento de mensalidades.
+    :param mesano: string (mes/ano)
+    :return: f_pago (float), f_npago (float), qtd_alunos (int)
+    """
     conexao = sqlite3.connect(dbfile)
-    print('mesano', mesano)
     c = conexao.cursor()
     c.execute('SELECT al_index FROM Alunos')
     alunos = c.fetchall()
@@ -664,7 +668,7 @@ def mensalidades_historico(indice):
             tmp = locale.currency(float(x[3]))
             mensalidades_moeda.append([x[0], x[1], x[2], tmp])
         else:
-            mensalidades_moeda.append([x[0], x[1], x[2], x[3]])
+            mensalidades_moeda.append([x[0], x[1], '--', '--'])
     dadoscolunas = []
     for idx, x in enumerate(mensalidades_moeda):
         dadoslinha = []
@@ -2979,7 +2983,7 @@ class Principal:
         # 'Save::savekey',
         ['&Editar', ['Configurações', 'Mudar tema', '---', 'Editar opções de treino', 'Editar planos'], ],
         ['&Relatórios', ['Recebimento', 'Devedores', 'Gráfico', 'Lista de alunos(imprime)']],
-        ['&Ferramentas', ['Backup parcial', 'Backup completo', 'Administração', ['Limpar banco de dados']]],
+        ['&Ferramentas', ['Backup parcial', 'Backup completo', ]],  # 'Administração', ['Limpar banco de dados']
         ['A&juda', ['Tela principal', 'Sobre...']], ]
     # ALTMENU
     right_click_menu = ['Unused', ['Abrir', '!&Click', '&Menu', 'E&xit', 'Properties']]
@@ -3921,7 +3925,6 @@ class Principal:
                                             valor_mens = float(valor_mens_str)
                                             if (desconto_original != 0.0 and desconto_original is not None) \
                                                     and not self.valuesinfo['-DESC-']:
-                                                print('desconto != 0.0 E não é none E DESC está desligado')
                                                 # porc_desc = float(sg.user_settings_get_entry(
                                                 # '-valordescontofamilia-')) valor_desc = valor_mens * porc_desc
                                                 # valor_final = (10.0 * valor_mens) / 9 print(valor_final) print(
@@ -3933,7 +3936,6 @@ class Principal:
                                                 desconto_final = 0.0
                                             elif ((desconto_original is None) or (desconto_original == 0.0)) \
                                                     and self.valuesinfo['-DESC-']:
-                                                print('entrou desc = None or 0.0 E DESC true')
                                                 desconto_final = \
                                                     float(sg.user_settings_get_entry('-valordescontofamilia-'))
                                                 # valor_desc = valor_mens * porc_desc
@@ -3951,7 +3953,6 @@ class Principal:
                                         cad_atv = 'S'
                                     else:
                                         cad_atv = 'N'
-                                    # EDITANDO2 TREINOS
                                     alterar_aluno(self.valuesinfo['-NOME-'].rstrip(), self.valuesinfo['-END-'].rstrip(),
                                                   self.valuesinfo['-TEL1-'].rstrip(), self.valuesinfo['-CPF-'].rstrip(),
                                                   self.valuesinfo['-EMAIL-'].rstrip(),
