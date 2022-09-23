@@ -45,6 +45,7 @@ import pdfgen
 #
 # A FAZER
 
+# planos_escreve ESTA COM UM PROBLEMA SERIO NA GERACAO DE MESES, VERIFICAR OUTRO PROG PARA SOLUCAO
 # BACKUPS PARECEM FUNCIONAR OK, PRECISA DE MAIS TESTES
 # OK VERIFICAR BACKUP COMPLETO, FAZENDO O BKP DO LUGAR ERRADO CRIANDO ARQUIVO ENORME
 # OK CORES NA TABELA PRINCIPAL NAO ESTAO FUNCIONANDO <---------------------------------- 28/08
@@ -304,7 +305,6 @@ def mensalidades_cria_tabela(index):
     conexao.close()
 
 
-
 def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso):
     """
     Insere dados na tabela mensalidade
@@ -380,6 +380,27 @@ def mensalidades_insere(index, mesano, diaven, valor, datapgto, vlrmulta, vlrext
 
 def mensalidades_insere_plano(alunoindex, mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso,
                               plindex, pldescricao, plinicio, plfim):
+    """
+    Insere os dados do plano na tabela alunos, e cria os dados de mensalidade na tabela mensalidades,
+    registrando a mensalidade como paga. Esta função cria SOMENTE UMA VEZ a mensalidade, portanto deve
+    ser executada quantas vezes for necessário, incrementando a data(mesano) de acordo com os meses do
+    plano adquirido.
+    :param alunoindex: Índice do aluno
+    :param mesano: mês e ano do primeiro pagamento
+    :param diaven: dia de vencimento
+    :param valor: valor com desconto
+    :param datapgto: data do primeiro pagamento
+    :param vlrmulta: valor do desconto
+    :param vlrextras:
+    :param vlrpago:
+    :param pg:
+    :param atraso:
+    :param plindex:
+    :param pldescricao:
+    :param plinicio:
+    :param plfim:
+    :return:
+    """
     inseredtultpgto = False
     dados = [mesano, diaven, valor, datapgto, vlrmulta, vlrextras, vlrpago, pg, atraso]
     conexao = sqlite3.connect(mdbfile)
@@ -491,6 +512,12 @@ def mensalidades_ler_atrasado(index, mesano):
 
 # FUNCAO CRIA MENSALIDADE ATRASADA NAS TABELAS
 def mensalidades_criar():
+    """
+    Cria as mensalidades dos alunos conforme os meses vão passando. As tabelas de mensalidades precisam
+    ter as mensalidades à pagar inseridas antes que estas possam ser pagas, para que já exista
+    o objeto na hora do pagamento. Esta função deve ser executada no início do programa.
+    :return: None.
+    """
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
     dia = datetime.strftime(datetime.now(), '%d')
@@ -529,6 +556,11 @@ def mensalidades_criar():
 
 # FUNCAO LISTA MENSALIDADES ANTIGAS
 def mensalidades_lista(index):
+    """
+    DEPRECATED: esta função não é mais utilizada. Ela deve ser eventualmente excluída.
+    :param index:
+    :return:
+    """
     conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
     nometabela = 'mens_' + str(index)
@@ -541,6 +573,12 @@ def mensalidades_lista(index):
 
 #  funcao que busca a ultima mensalidade paga
 def mensalidades_ultima_paga(index):
+    """
+    Função utilizada no momento em que o aluno vai aderir a um plano. Retorna 0 se não houver mensalidade
+    paga, ou uma lista de mesano da última mensalidade paga.
+    :param index:
+    :return:
+    """
     # Retorna 0 se não houver mensalidade paga, ou mesano da ultima paga
     nometabela = 'mens_' + str(index)
     conexao = sqlite3.connect(mdbfile)
@@ -682,6 +720,7 @@ def mensalidades_historico(indice):
     dadossort = sort_table(dadoscolunas, (1, 0))
     return dadossort
 
+
 # FUNCAO LE A TABELA OPCAO
 def opcao_ler():
     conexao = sqlite3.connect(dbfile)
@@ -798,6 +837,8 @@ def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
     conexao.commit()
     conexao.close()
     dadosmens = []
+    # ###################################################################################################
+    # TA ERRADO TEM QUE FAZER IGUAL O OUTRO PROGRAMA
     dia = inicio[0:2]
     ano = inicio[6:]
     # print(inicio[3:5])
@@ -2668,24 +2709,24 @@ class Pagamentos:
                 select_mode=sg.TABLE_SELECT_MODE_BROWSE
             )],
         ], size=(250, 180)), ],
-            [
-              sg.Frame('', [
-                  # sg.T('Data do pagamento:'),
-                  [sg.CalendarButton('Data do pagamento', locale='pt_BR', format='%d/%m/%Y',
-                                     month_names=meses,
-                                     day_abbreviations=dias,
-                                     tooltip='Clique para mudar a data'), sg.Push(),
-                   sg.Input(k='-DATAPAGTO-', size=(10, 1),
-                            default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'),
-                            enable_events=True),
-                   ],
-                  # [sg.T('Valor recebido:'), sg.Push(),
-                  # sg.I(s=(10, 1), k='-VALORRECEBIDO-', justification='right',
-                  #      focus=True, enable_events=True)],
-                  # [sg.T('Troco:'), sg.Push(),
-                  #  sg.I(s=(10, 1), k='-TROCO-', justification='right')],
-              ], size=(250, 100)),
-          ]])
+                                  [
+                                      sg.Frame('', [
+                                          # sg.T('Data do pagamento:'),
+                                          [sg.CalendarButton('Data do pagamento', locale='pt_BR', format='%d/%m/%Y',
+                                                             month_names=meses,
+                                                             day_abbreviations=dias,
+                                                             tooltip='Clique para mudar a data'), sg.Push(),
+                                           sg.Input(k='-DATAPAGTO-', size=(10, 1),
+                                                    default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                                                    enable_events=True),
+                                           ],
+                                          # [sg.T('Valor recebido:'), sg.Push(),
+                                          # sg.I(s=(10, 1), k='-VALORRECEBIDO-', justification='right',
+                                          #      focus=True, enable_events=True)],
+                                          # [sg.T('Troco:'), sg.Push(),
+                                          #  sg.I(s=(10, 1), k='-TROCO-', justification='right')],
+                                      ], size=(250, 100)),
+                                  ]])
 
         self.coluna2 = sg.Column([[sg.Frame('', [
             [sg.T('Valores a receber')],
@@ -2707,7 +2748,7 @@ class Pagamentos:
              sg.I(k='-VALORALT-', s=(10, 1), justification='right'),
              sg.B('Alterar', k='-ALTERA-', s=(12, 1))],
             [sg.Push(), sg.T('Total:', font='_ 10 bold', s=(10, 1)), sg.I(k='-VALORFINAL-', s=(10, 1), font='_ 10 bold',
-                                                          justification='right'),
+                                                                          justification='right'),
              sg.B('Receber <F5>', k='-RECEBER-', font='_ 10 bold', s=(12, 1))],
             [sg.Push(), sg.B('Imprimir recibo <F6>', k='-IMPRIMIR-', disabled=True), ]
         ], size=(400, 287)), ]])
