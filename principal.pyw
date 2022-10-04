@@ -44,9 +44,18 @@ import pdfgen
 # PROGRAMA DE GERENCIAMENTO DE ALUNOS LOTUS
 #
 # A FAZER
-
-# planos_escreve ESTA COM UM PROBLEMA SERIO NA GERACAO DE MESES, VERIFICAR OUTRO PROG PARA SOLUCAO
+#
+# RELATORIO DE PAGAMENTOS - CORRIGIR VALORES E TIRAR COR DA TABELA
+# LIMPAR A TABELA DO LADO DIREITO APOS RECEBER MENSALIDADE - TALVEZ NAO
+# CRIAR MENSALIDADES DESDE A DATA DE MATRICULA <----------- MUITO IMPORTANTE - TALVEZ NAO
+# VERIFICAR SE ESTAO SENDO CRIADAS MENSALIDADES PARA ALUNOS INATIVOS - APARENTEMENTE NAO
 # BACKUPS PARECEM FUNCIONAR OK, PRECISA DE MAIS TESTES
+# OK - QUANDO APAGA O ALUNO ELE NAO E APAGADO, E SIM MARCADO COMO INATIVO
+# OK - NAO ESTAO - VERIFICAR SE ALUNOS INATIVOS ESTAO ENTRANDO NOS RELATORIOS DE MENSALIDADES DEVIDAS
+# OK - ESTAO - VERIFICAR SE OS VALORES DOS ALUNOS INATIVOS ESTAO ENTRANDO NOS REL. DE MENS. RECEBIDA
+# PARECE OK - planos_escreve ESTA COM UM PROBLEMA SERIO NA GERACAO DE MESES, VERIFICAR OUTRO PROG PARA SOLUCAO
+# OK CRIAR MENSALIDADE - FAZER CHECAGEM SE A MENSALIDADE EXISTE ANTES
+# OK - VER POR QUE NAO ESTAO SENDO COLORIDOS OS ALUNOS INATIVOS
 # OK VERIFICAR BACKUP COMPLETO, FAZENDO O BKP DO LUGAR ERRADO CRIANDO ARQUIVO ENORME
 # OK CORES NA TABELA PRINCIPAL NAO ESTAO FUNCIONANDO <---------------------------------- 28/08
 # OK ALTERAR VALOR DA MENSALIDADE NA HORA DE INSERIR
@@ -825,6 +834,17 @@ def planos_busca(index):
 
 # ESCREVE OS DADOS DO PLANO DO ALUNO
 def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
+    """
+    Entra com os dados do plano na tabela alunos e na tabela mensalidade
+    :param index:
+    :param planoindex:
+    :param plano:
+    :param inicio: data no formato 00/00/0000
+    :param fim: data no formato 00/00/0000
+    :param duracao:
+    :param vlrmensal:
+    :return:
+    """
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
     # c.execute('SELECT al_pl_fim FROM Alunos WHERE al_index', (index,))
@@ -838,24 +858,25 @@ def planos_escreve(index, planoindex, plano, inicio, fim, duracao, vlrmensal):
     conexao.close()
     dadosmens = []
     # ###################################################################################################
-    # TA ERRADO TEM QUE FAZER IGUAL O OUTRO PROGRAMA
     dia = inicio[0:2]
-    ano = inicio[6:]
+    # ano = inicio[6:]
+    inicio_date = datetime.strptime(inicio, '%d/%m/%Y')
     # print(inicio[3:5])
-    mesint = int(inicio[3:5])
+    # mesint = int(inicio[3:5])
     x = 0
     mesano = []
     while x < duracao:
-        mesint2 = mesint + x
-        messtr = str(mesint2)
-        if len(messtr) == 1:
-            messtr = '0' + messtr
-        mesano.append(messtr + '/' + ano)
+        if x > 0:
+            inicio_date = inicio_date + relativedelta(months=+1)
+        else:
+            pass
+        messtr = inicio_date.strftime('%m/%Y')
+        mesano.append(messtr)
         x = x + 1
     conexao = sqlite3.connect(mdbfile)
     c = conexao.cursor()
     nometabela = 'mens_' + str(index)
-    # print(mesano)
+    print(mesano)
     for idx, x in enumerate(mesano):
         dados = [x, dia, inicio, vlrmensal, 1]
         comando = 'INSERT INTO ' + nometabela + '(me_mesano, me_diaven, me_datapgto, me_vlrpago, me_pg) VALUES (?,?,' \
@@ -895,6 +916,21 @@ def planos_acabando(index):
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
     c.execute('SELECT al_pl_fim FROM Alunos WHERE al_index = ?', (index,))
+    resultado = c.fetchone()[0]
+    # print(resultado)
+    conexao.close()
+    return resultado
+
+
+def aluno_inativo(index):
+    """
+    Checa se o aluno está inativo
+    :param index:
+    :return: status do aluno
+    """
+    conexao = sqlite3.connect(dbfile)
+    c = conexao.cursor()
+    c.execute('SELECT al_ativo FROM Alunos WHERE al_index = ?', (index,))
     resultado = c.fetchone()[0]
     # print(resultado)
     conexao.close()
@@ -1020,8 +1056,10 @@ def apaga_registro(index):
     # todo alterar esta funcao
     conexao = sqlite3.connect(dbfile)
     c = conexao.cursor()
-    c.execute('DELETE FROM Financeiro WHERE fi_nome = ?', (index,))
-    c.execute('DELETE FROM Alunos WHERE al_index = ?', (index,))
+    # c.execute('DELETE FROM Financeiro WHERE fi_nome = ?', (index,))
+    # c.execute('DELETE FROM Alunos WHERE al_index = ?', (index,))
+    ativo = 'N'
+    c.execute('UPDATE Alunos SET al_ativo = ? WHERE pl_index = ?', (ativo, index))
     conexao.commit()
     conexao.close()
 
@@ -2709,24 +2747,24 @@ class Pagamentos:
                 select_mode=sg.TABLE_SELECT_MODE_BROWSE
             )],
         ], size=(250, 180)), ],
-                                  [
-                                      sg.Frame('', [
-                                          # sg.T('Data do pagamento:'),
-                                          [sg.CalendarButton('Data do pagamento', locale='pt_BR', format='%d/%m/%Y',
-                                                             month_names=meses,
-                                                             day_abbreviations=dias,
-                                                             tooltip='Clique para mudar a data'), sg.Push(),
-                                           sg.Input(k='-DATAPAGTO-', size=(10, 1),
-                                                    default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'),
-                                                    enable_events=True),
-                                           ],
-                                          # [sg.T('Valor recebido:'), sg.Push(),
-                                          # sg.I(s=(10, 1), k='-VALORRECEBIDO-', justification='right',
-                                          #      focus=True, enable_events=True)],
-                                          # [sg.T('Troco:'), sg.Push(),
-                                          #  sg.I(s=(10, 1), k='-TROCO-', justification='right')],
-                                      ], size=(250, 100)),
-                                  ]])
+      [
+          sg.Frame('', [
+              # sg.T('Data do pagamento:'),
+              [sg.CalendarButton('Data do pagamento', locale='pt_BR', format='%d/%m/%Y',
+                                 month_names=meses,
+                                 day_abbreviations=dias,
+                                 tooltip='Clique para mudar a data'), sg.Push(),
+               sg.Input(k='-DATAPAGTO-', size=(10, 1),
+                        default_text=datetime.strftime(datetime.now(), '%d/%m/%Y'),
+                        enable_events=True),
+               ],
+              # [sg.T('Valor recebido:'), sg.Push(),
+              # sg.I(s=(10, 1), k='-VALORRECEBIDO-', justification='right',
+              #      focus=True, enable_events=True)],
+              # [sg.T('Troco:'), sg.Push(),
+              #  sg.I(s=(10, 1), k='-TROCO-', justification='right')],
+          ], size=(250, 100)),
+      ]])
 
         self.coluna2 = sg.Column([[sg.Frame('', [
             [sg.T('Valores a receber')],
@@ -3028,6 +3066,7 @@ class Principal:
         ['A&juda', ['Tela principal', 'Sobre...']], ]
     # ALTMENU
     right_click_menu = ['Unused', ['Abrir', '!&Click', '&Menu', 'E&xit', 'Properties']]
+
     row = []
     dados = []
     sort = True
@@ -3212,6 +3251,20 @@ class Principal:
                     # self.window['-CAIXA-'].print(
                     #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
                 self.planos_acabando.append((x[0], diasfim))
+            indice = indice + 1
+        # CHECA SE O ALUNO É INATIVO
+        tmptabela = self.window['-TABELA-'].Values
+        indice = 0
+        for idx, x in enumerate(tmptabela):
+            # print(x[0])
+            al_ativo = aluno_inativo(x[0])
+            # print(dttemp)
+            if al_ativo is not None and al_ativo == 'N':
+                self.window['-TABELA-'].Update(
+                    row_colors=[[indice, sg.user_settings_get_entry('-coralunoinativo-')]])
+                # self.window['-CAIXA-'].print(
+                #    'O plano de ' + x[1] + ' tem ' + str(diasfim) + ' dias para acabar.')
+                # self.planos_acabando.append((x[0], diasfim))
             indice = indice + 1
 
     def run(self):
