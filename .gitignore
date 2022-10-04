@@ -1,0 +1,160 @@
+
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml
+.idea/LotusV2.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+__pycache__/contabil.cpython-310.pyc
+__pycache__/cores.cpython-310.pyc
+__pycache__/pdfgen.cpython-310.pyc
+ajuda/adicionar.html
+ajuda/cadastro.html
+ajuda/cadastro.png
+ajuda/imagens.sketch
+ajuda/index.html
+ajuda/informacoes.html
+ajuda/inicio.html
+ajuda/principal.png
+ajuda/principal.txt
+ajuda/receber mensalidade.png
+ajuda/sobre.txt
+ajuda/telacadastro.html
+ajuda/telaprincipal.html
+ajuda/Template.mzt
+ajustes/contabil.json
+ajustes/principal.json
+ajustes/principal.v2.json
+calcdatas/calcdatas2/main.py
+calcdatas/main.py
+Calibri.cw127.pkl
+Calibri.pkl
+calibri.ttf
+Calibrib.cw127.pkl
+Calibrib.pkl
+calibrib.ttf
+Calibrii.pkl
+calibrii.ttf
+calibril.ttf
+calibrili.ttf
+calibriz.ttf
+db/financeiro.db
+db/historico.db
+db/mensalidades.db
+db/mensalidades.sqbpro
+db/sistema.db
+errorlog.txt
+gicons/1x/outline_account_balance_white_24dp.png
+gicons/1x/outline_account_circle_white_24dp.png
+gicons/1x/outline_credit_card_white_24dp.png
+gicons/1x/outline_dangerous_white_24dp.png
+gicons/1x/outline_info_white_24dp.png
+gicons/1x/outline_pix_white_24dp.png
+gicons/1x/outline_shopping_cart_white_24dp.png
+gicons/1x/outline_sports_gymnastics_white_24dp.png
+gicons/2x/banco.png
+gicons/2x/config.png
+gicons/2x/credito.png
+gicons/2x/erro.png
+gicons/2x/esporte.png
+gicons/2x/info.png
+gicons/2x/loja.png
+gicons/2x/pessoa.png
+gicons/2x/pix.png
+gicons/accountwhite-24dp.zip
+gicons/accwhite-24dp.zip
+gicons/credit_card_FILL0_wght400_GRAD0_opsz48.png
+gicons/credwhite-24dp.zip
+gicons/dawhite-24dp.zip
+gicons/icones novos/attach money white-24dp.zip
+gicons/icones novos/backup white-24dp.zip
+gicons/icones novos/calculate white-24dp.zip
+gicons/icones novos/clean white-24dp.zip
+gicons/icones novos/contact page white-24dp.zip
+gicons/icones novos/info white-24dp.zip
+gicons/icones novos/monetization on white-24dp.zip
+gicons/icones novos/payments white-24dp.zip
+gicons/icones novos/person add white-24dp.zip
+gicons/icones novos/person search white-24dp.zip
+gicons/icones novos/poll white-24dp.zip
+gicons/icones novos/refresh white-24dp.zip
+gicons/icones novos/save white-24dp.zip
+gicons/icones novos/search - white-24dp.zip
+gicons/icones novos/shopping basket white-24dp.zip
+gicons/icones novos/shopping cart white-24dp.zip
+gicons/payments_FILL0_wght400_GRAD0_opsz48.png
+gicons/pixwhite-24dp.zip
+gicons/sewhite-24dp.zip
+gicons/shwhite-24dp.zip
+gicons/shwhite-24dp/1x/outline_shopping_cart_white_24dp.png
+gicons/shwhite-24dp/2x/outline_shopping_cart_white_24dp.png
+gicons/sports_FILL0_wght400_GRAD0_opsz48.png
+gicons/spwhite-24dp.zip
+gicons/table_FILL0_wght400_GRAD0_opsz48.png
+gicons/toggleonwhite-24dp.zip
+gicons/togglewhite-24dp.zip
+gicons/white-24dp.zip
+lista.pdf
+r_financeiro_mensal.pdf
+recibo.pdf
+recursos/barra do programa.ai
+recursos/barra.png
+recursos/icon.png
+recursos/icones/banco.png
+recursos/icones/config.png
+recursos/icones/credito.png
+recursos/icones/erro.png
+recursos/icones/esporte.png
+recursos/icones/info.png
+recursos/icones/loja.png
+recursos/icones/pessoa.png
+recursos/icones/pix.png
+recursos/logo.png
+recursos/logo.png.edu
+recursos/logo_icon.ico
+recursos/logo_icon.ico.edu
+recursos/logo_small antigo.png
+recursos/logo_small.png
+recursos/SumatraPDF-settings.txt
+recursos/SumatraPDF.exe
+recursos/sumatrapdfcache/28b6d12a607e9433f161832082ed8ab5.png
+recursos/sumatrapdfcache/b6dd8cd6703013ed9a8be002c680bf53.png
+recursos/sumatrapdfcache/c869fefe8834ea0ab139aab05e5cb13f.png
+recursos/sumatrapdfcache/d155e3bc9e86ff8937497caa4c80c997.png
+recursos/sumatrapdfcache/d30bc4d49eaff419ca4470a1d4d9357f.png
+recursos/sumatrapdfcache/f5fe96c6b486b7b4eaef5321c0981b06.png
+relatorio.pdf
+Roboto - LICENSE.txt
+Roboto-Bold.cw127.pkl
+Roboto-Bold.pkl
+Roboto-Bold.ttf
+Roboto-Medium.cw127.pkl
+Roboto-Medium.pkl
+Roboto-Medium.ttf
+Roboto-MediumItalic.pkl
+Roboto-MediumItalic.ttf
+Roboto-Regular.cw127.pkl
+Roboto-Regular.pkl
+Roboto-Regular.ttf
+snippets.txt
+tests/alteratododb.py
+tests/backupcompleto.py
+tests/codigo.txt
+tests/colorchooser.py
+tests/combobox.py
+tests/courier.py
+tests/data.py
+tests/errorhandling.py
+tests/errorlog.txt
+tests/fadeinnotifications.py
+tests/filefolder.py
+tests/indexcombo.py
+tests/maximize.py
+tests/mylongop.py
+tests/tablerownumber.py
+tests/testdirectory.py
+tests/testtableempty.py
+tests/themes.py
+update.json
+update.pyw
+vendas.pdf
